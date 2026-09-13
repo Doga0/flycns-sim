@@ -1,4 +1,50 @@
-# malecns-sim v0.1
+# malecns-sim v0.2 — MaleCNS Graph Core
+
+v0.2 adds an audited, deterministic sparse graph of MaleCNS connectivity. The
+FlyGym body from v0.1 remains independent: **there is no CNS → joint connection,
+neural dynamics, transmitter sign assignment, or RL in this release**.
+
+For graph setup, policy definitions, storage layout, queries, and acceptance
+checks, read [the Graph Core guide](docs/graph-core.md). The Windows/Docker body
+setup below is still applicable.
+
+After installing the environment and downloading the raw data, run from the
+repository root (choose either local uv or Docker):
+
+```powershell
+uv run python -m malecns_sim.cns.census
+uv run python -m malecns_sim.cns.graph.build --policy published
+uv run python -m malecns_sim.cns.graph.validate data/processed/malecns-v1.0/published-v1
+```
+
+```powershell
+docker compose build
+docker compose run --rm sim python -m malecns_sim.cns.census
+docker compose run --rm sim python -m malecns_sim.cns.graph.build --policy published
+docker compose run --rm sim python -m malecns_sim.cns.graph.validate data/processed/malecns-v1.0/published-v1
+```
+
+Both workflows share the host's `data/` directory. **Build once**, then load or
+validate the result. The builder refuses to overwrite an existing directory;
+use `--output data/processed/malecns-v1.0/another-run` for a separate build.
+
+The default `published` profile retains **166,700 node candidates**, compared with
+the publication's **166,691 neurons**. The **+9 discrepancy remains unresolved**;
+this profile is explicitly provisional, not an exact published membership claim.
+The actual build contains **25,582,938 unique directed edges** and **124,177,617
+contacts**. See the guide for the census audit and exclusion accounting.
+
+Run the graph tests after building:
+
+```powershell
+uv run pytest tests/test_graph.py -q
+```
+
+For small graph fixtures without the full built graph:
+
+```powershell
+uv run pytest tests/test_graph.py -m "not graph" -q
+```
 
 Two independent foundations in a Python 3.12 environment: raw **MaleCNS v1.0** data
 and a **FlyGym 2.1 / MuJoCo 3.9** physical body. The CNS and body are **not connected yet**.
@@ -296,14 +342,14 @@ when using it for research.
 After downloading the three CNS files, run the full test suite with Docker:
 
 ```powershell
-docker compose run --rm sim pytest -q
+docker compose run --rm sim pytest tests/test_cns.py tests/test_simulation.py -q
 ```
 
 The previous v0.1 acceptance run reported **14 passed**. Runtime depends on your
 computer. To run the same test suite in the local uv environment:
 
 ```powershell
-uv run pytest -q
+uv run pytest tests/test_cns.py tests/test_simulation.py -q
 ```
 
 `pytest` runs the four real acceptance checks below, plus small tests for failure
@@ -319,11 +365,11 @@ download command. Tests do not automatically download large files.
 To check just the code and body without downloading data, choose either workflow:
 
 ```powershell
-docker compose run --rm sim pytest -q -m "not dataset"
+docker compose run --rm sim pytest tests/test_cns.py tests/test_simulation.py -q -m "not dataset"
 ```
 
 ```powershell
-uv run pytest -q -m "not dataset"
+uv run pytest tests/test_cns.py tests/test_simulation.py -q -m "not dataset"
 ```
 
 This selection excludes dataset tests and does not replace the full v0.1
@@ -398,10 +444,10 @@ session; it does not delete files. Docker Compose settings remain unchanged.
 
 ## Version boundary
 
-v0.1 stops here. PyTorch, Brian2, LIF, GNN, RL, CUDA, motor neuron mapping, and
-Three.js are not included. The next stages are: graph representation → neural
-dynamics → sensory interface → motor mapping → closed loop → RL → custom worlds
-→ web viewer.
+v0.1 supplies raw data access and the independent physical body. v0.2 supplies
+node policies, census auditing, and sparse COO/CSR connectivity. Work stops at
+Graph Core: LIF/GNN dynamics, transmitter signs, motor mapping, sensory coupling,
+closed-loop simulation, RL, CUDA, and Three.js remain outside this release.
 
 ## References
 

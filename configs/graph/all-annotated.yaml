@@ -1,0 +1,10 @@
+schema: 1
+id: all-annotated-v1
+description: All annotation rows, including glia and unresolved segments; not a neuron census.
+reference_neurons: 166691
+reference_membership_verified: false
+selection:
+  all: []
+edge_policy: all-released
+self_edges_preserved: true
+edge_threshold: null

@@ -4,6 +4,7 @@ WORKDIR /app
 COPY pyproject.toml uv.lock README.md ./
 RUN uv sync --locked --no-install-project
 COPY src ./src
+COPY configs ./configs
 RUN uv sync --locked --no-editable
 
 FROM python:3.12.11-slim-bookworm
@@ -20,5 +21,7 @@ COPY --from=builder /opt/venv /opt/venv
 COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
 COPY tests ./tests
+COPY configs ./configs
 RUN mkdir -p data outputs
+COPY docs ./docs
 CMD ["python", "-m", "malecns_sim.simulation.smoke_test", "--headless"]
