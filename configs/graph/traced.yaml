@@ -1,0 +1,11 @@
+schema: 1
+id: traced-v1
+description: Experimental comparison retaining exactly status == Traced.
+reference_neurons: 166691
+reference_membership_verified: false
+selection:
+  column: status
+  in: [Traced]
+edge_policy: all-released
+self_edges_preserved: true
+edge_threshold: null
