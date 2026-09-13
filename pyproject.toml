@@ -1,0 +1,40 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "malecns-sim"
+version = "0.1.0"
+description = "Independent MaleCNS data and NeuroMechFly body smoke tests."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "flygym @ git+https://github.com/NeLy-EPFL/flygym.git@v2.1.0",
+    "mujoco>=3.9,<3.10",
+    "numpy>=2.0,<3.0",
+    "pandas>=2.2,<4",
+    "pyarrow>=18",
+    "requests>=2.32,<3",
+    "tqdm>=4.67,<5",
+    "pillow>=11,<13",
+]
+
+[dependency-groups]
+dev = ["pytest>=8,<10", "ruff>=0.9,<1"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/malecns_sim"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["dataset: requires the three downloaded MaleCNS v1.0 files"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]

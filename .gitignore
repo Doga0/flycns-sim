@@ -1,0 +1,13 @@
+data/*
+!data/.gitkeep
+outputs/*
+!outputs/.gitkeep
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+.tools/
+MUJOCO_LOG.TXT

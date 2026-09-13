@@ -1,0 +1,9 @@
+services:
+  sim:
+    build: .
+    volumes:
+      - ./data:/app/data
+      - ./outputs:/app/outputs
+    environment:
+      MUJOCO_GL: osmesa
+      PYOPENGL_PLATFORM: osmesa
