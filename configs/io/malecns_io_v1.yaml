@@ -1,0 +1,57 @@
+schema: 1
+id: malecns-io-v1
+source_field: superclass
+role_mapping:
+  sensory:
+    - ol_sensory
+    - cb_sensory
+    - cb_sensory_tbc
+    - vnc_sensory
+    - vnc_sensory_tbc
+    - sensory_ascending
+    - sensory_ascending_tbc
+    - sensory_descending
+  motor:
+    - cb_motor
+    - vnc_motor
+  descending:
+    - descending_neuron
+    - descending_neuron_tbc
+  ascending:
+    - ascending_neuron
+  interneuron:
+    - ol_intrinsic
+    - cb_intrinsic
+    - vnc_intrinsic
+    - visual_projection
+    - visual_projection_tbc
+    - visual_centrifugal
+  endocrine:
+    - cb_endocrine
+    - vnc_endocrine
+  other:
+    - ENS
+    - cb_efferent
+    - vnc_efferent
+    - efferent_ascending
+    - efferent_descending
+    - vnc_tbc
+sensory_system_from_class:
+  visual: visual
+  olfactory: olfactory
+  gustatory: gustatory
+  chemosensory: chemosensory
+  hygrosensory: hygrosensory
+  thermosensory: thermosensory
+  mechanosensory: mechanosensory
+  mechanosensory_tactile: mechanosensory
+  mechanosensory_proprioceptive: mechanosensory
+  mechanosensory_tbc: mechanosensory
+  unknown_sensory: unknown
+side_source_priority:
+  - rootSide
+  - somaSide
+nerve_source_by_role:
+  sensory: entryNerve
+  motor: exitNerve
+body_region_source_field: somaNeuromere
