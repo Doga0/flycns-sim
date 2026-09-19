@@ -14,7 +14,14 @@ import pyarrow.parquet as pq
 from malecns_sim.cns.graph.store import file_hashes, write_json
 
 
-def save_result(backend, output: Path, *, experiment: str, extra: dict | None = None) -> dict:
+def save_result(
+    backend,
+    output: Path,
+    *,
+    experiment: str,
+    extra: dict | None = None,
+    extra_tables: dict[str, pa.Table] | None = None,
+) -> dict:
     if output.exists():
         raise FileExistsError(f"Result directory exists: {output}")
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -139,6 +146,16 @@ def save_result(backend, output: Path, *, experiment: str, extra: dict | None = 
                 compression="zstd",
             )
             artifacts.append("state_trace.parquet")
+        for name, table in sorted((extra_tables or {}).items()):
+            if (
+                not name.endswith(".parquet")
+                or Path(name).name != name
+                or name in artifacts
+                or not isinstance(table, pa.Table)
+            ):
+                raise ValueError(f"Invalid extra result table: {name}")
+            pq.write_table(table, stage / name, compression="zstd")
+            artifacts.append(name)
         summary["artifacts"] = {name: file_hashes(stage / name) for name in artifacts}
         write_json(stage / "summary.json", summary)
         stage.rename(output)
@@ -153,8 +170,12 @@ def validate_result(directory: str | Path) -> dict:
     directory = Path(directory)
     summary = json.loads((directory / "summary.json").read_text(encoding="utf-8"))
     required = {"spikes.parquet", "rates.parquet", "node_mapping.parquet", "experiment.json"}
-    if set(summary["artifacts"]) not in (required, required | {"state_trace.parquet"}):
-        raise ValueError("Unexpected result artifact manifest")
+    artifact_names = set(summary["artifacts"])
+    if not required <= artifact_names:
+        raise ValueError("Missing required result artifacts")
+    for name in artifact_names - required - {"state_trace.parquet"}:
+        if Path(name).name != name or not name.endswith(".parquet"):
+            raise ValueError("Unexpected result artifact name")
     for name in sorted(summary["artifacts"]):
         if file_hashes(directory / name) != summary["artifacts"][name]:
             raise ValueError(f"Result checksum mismatch: {name}")
