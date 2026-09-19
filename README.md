@@ -1,9 +1,65 @@
-# malecns-sim v0.3 — MaleCNS LIF Reference Model
+# malecns-sim v0.4 — MaleCNS I/O Catalogue
 
-v0.3 turns the v0.2 sparse connectome into a **Shiu-derived Brian2 LIF neural
-network**. Stimulate neurons and measure connectivity-driven spike activity.
-**The FlyGym/MuJoCo body remains independent.** There is no motor mapping,
-sensory feedback, training, or CNS → joint connection.
+v0.4 adds a versioned anatomical interface catalogue over the v0.2 graph. It
+answers which retained MaleCNS cells are sensory, motor, descending, ascending,
+intrinsic, endocrine, or other, while preserving every released annotation used
+to make that decision. v0.3 still provides the Shiu-derived Brian2 LIF engine.
+**The FlyGym/MuJoCo body remains independent:** no encoder, motor decoder,
+actuator mapping, sensory feedback, training, or CNS-to-joint connection exists.
+
+## Start with the I/O catalogue
+
+The raw files and `published-v1` graph must already exist. Run these commands
+from the repository root:
+
+```powershell
+uv sync --locked
+
+# Audit the real released schema and every classification value
+uv run python -m malecns_sim.io.audit
+
+# Build once; this refuses to overwrite an existing io-v1 directory
+uv run python -m malecns_sim.io.build
+
+# Verify graph identity, raw metadata and all normalized derivations
+uv run python -m malecns_sim.io.validate data/processed/malecns-v1.0/published-v1/io-v1
+
+# Print role counts and query exact annotation values
+uv run python -m malecns_sim.io.inspect
+uv run python -m malecns_sim.io.query --role motor --side L
+uv run python -m malecns_sim.io.query --role sensory --class mechanosensory_proprioceptive --subclass leg
+uv run python -m malecns_sim.io.query --role descending --type DNa01
+
+# Report configured FlyGym/MuJoCo channels; this does not map or move the body
+uv run python -m malecns_sim.simulation.body_io
+```
+
+The built catalogue contains 166,700 rows: 17,937 sensory, 815 motor, 1,316
+descending, 1,846 ascending, 144,494 interneuron, 94 endocrine, and 198 other.
+All graph nodes match an explicit released `superclass` rule. These are policy
+counts over the provisional 166,700-node graph; the published 166,691 census
+discrepancy described below remains unresolved.
+
+Run the first anatomy-aware neural experiment with a real population:
+
+```powershell
+uv run python -m malecns_sim.io.experiment `
+    --class mechanosensory_proprioceptive `
+    --subclass leg `
+    --duration-ms 100 `
+    --rate-hz 100 `
+    --seed 42 `
+    --output outputs/io/leg_proprio_demo
+```
+
+This stimulates 190 released leg proprioceptive sensory annotations in the full
+LIF graph and writes `active_neurons.parquet` plus role-level activity. It is an
+anatomical connectivity experiment, not a FlyGym sensor encoder or a biological
+locomotion claim. Output directories are never overwritten.
+
+Read [the I/O Catalogue guide](docs/io-catalogue.md) for exact role rules,
+normalization provenance, query APIs, result schemas, body channel inventory,
+measured acceptance results, and Docker commands.
 
 ## Start with the neural model
 
@@ -110,12 +166,14 @@ The working directory may be named `flycns-sim`; the Python package is `malecns_
 src/malecns_sim/
 ├── cns/          Raw data inspection / census / deterministic anatomical graph
 ├── neural/       Transmitter policy / Brian2 LIF / stimuli / spikes and rates
+├── io/           Functional role catalogue / selectors / anatomy-aware reports
 └── simulation/   NeuroMechFly → FlatGroundWorld → MjModel / MjData → physics / render
 ```
 
 The raw `CNSDataset` reader leaves released `minconf-0.5` tables unchanged.
 `cns/graph/` applies a documented node policy and preserves anatomical contact
 counts. Only `neural/` assigns transmitter signs and model weights.
+`io/` derives functional interface annotations without changing the graph.
 `simulation/` does not access CNS data. This version makes no claim about walking
 or biological behavior.
 
@@ -505,13 +563,17 @@ v0.1 supplies raw data access and the independent physical body. v0.2 supplies
 node policies, census auditing, and sparse COO/CSR connectivity. v0.3 adds the
 Shiu-derived Brian2 LIF engine, transmitter policy, scheduled stimuli, and spike
 results. Motor mapping, sensory coupling, closed-loop simulation, RL, GPU
-backends, GNN dynamics, and Three.js remain outside this release.
+backends, GNN dynamics, and Three.js remain outside this release. v0.4 adds the
+I/O catalogue, exact queries, anatomy-aware spike reports, and a body channel
+inventory; it still defines no mapping across the CNS/body boundary.
 
 ## References
 
 - [Official MaleCNS data distribution](https://male-cns.janelia.org/download/)
+- [MaleCNS neuPrint query example](https://male-cns.janelia.org/download/)
 - [Shiu et al. whole-brain model](https://pmc.ncbi.nlm.nih.gov/articles/PMC11446845/)
 - [Shiu reference implementation](https://github.com/philshiu/Drosophila_brain_model/blob/main/model.py)
 - [FlyGym v2.1.0 dependencies](https://github.com/NeLy-EPFL/flygym/blob/v2.1.0/pyproject.toml)
 - [FlyGym basic model composition](https://neuromechfly.org/tutorials/1a_basic_model_composition/)
+- [FlyGym body composition API](https://neuromechfly.org/api_reference/flygym/compose/fly/base_fly/)
 - [FlyGym rendering and interactive viewer](https://neuromechfly.org/api_reference/flygym/rendering/)
