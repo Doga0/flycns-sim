@@ -1,8 +1,64 @@
-# malecns-sim v0.2 — MaleCNS Graph Core
+# malecns-sim v0.3 — MaleCNS LIF Reference Model
 
-v0.2 adds an audited, deterministic sparse graph of MaleCNS connectivity. The
-FlyGym body from v0.1 remains independent: **there is no CNS → joint connection,
-neural dynamics, transmitter sign assignment, or RL in this release**.
+v0.3 turns the v0.2 sparse connectome into a **Shiu-derived Brian2 LIF neural
+network**. Stimulate neurons and measure connectivity-driven spike activity.
+**The FlyGym/MuJoCo body remains independent.** There is no motor mapping,
+sensory feedback, training, or CNS → joint connection.
+
+## Start with the neural model
+
+Open PowerShell in the repository root. For an existing local installation,
+update dependencies first:
+
+```powershell
+uv sync --locked
+uv run pytest tests/neural -m "not graph" -q
+uv run python -m malecns_sim.neural.experiments.toy --seed 42
+uv run python -m malecns_sim.neural.visualize outputs/neural/toy --toy-latency
+```
+
+The toy experiment needs no downloaded data. It writes spike times, firing
+rates, model parameters and a summary to `outputs/neural/toy/`. The commands
+below need the built `published-v1` graph; follow the graph setup immediately
+below if it is missing.
+
+```powershell
+# 5,000-node maximum; 100 ms baseline, 500 ms stimulation, 400 ms recovery
+uv run python -m malecns_sim.neural.experiments.subgraph --seed 42 --output outputs/neural/subgraph_demo
+
+# Full graph: start with only 100 ms, stimulating throughout this short run
+uv run python -m malecns_sim.neural.experiments.full_cns `
+    --duration-ms 100 `
+    --stimulate-body-id 11755 `
+    --rate-hz 100 `
+    --seed 42 `
+    --output outputs/neural/full_demo
+
+# Read the results without starting another simulation
+Get-Content outputs/neural/full_demo/summary.json
+uv run python -m malecns_sim.neural.result outputs/neural/full_demo
+```
+
+`11755` is a real retained body ID in the supplied MaleCNS v1.0 graph. It was
+chosen by the strongest positive-to-positive non-self connection, **not a
+behavioral or sensory annotation**. Output directories are never overwritten;
+choose a new `--output` for each experiment.
+
+For Docker, build the updated image, then use the same mounted graph:
+
+```powershell
+docker compose build
+docker compose run --rm sim python -m malecns_sim.neural.experiments.toy --output outputs/neural/toy_docker
+docker compose run --rm sim python -m malecns_sim.neural.experiments.full_cns --duration-ms 100 --stimulate-body-id 11755 --rate-hz 100 --seed 42 --output outputs/neural/full_docker
+uv run python -m malecns_sim.neural.result outputs/neural/full_demo --compare outputs/neural/full_docker
+```
+
+Read [the Neural Reference guide](docs/neural-reference.md) for the exact model,
+unknown-NT policy, subgraph selection, stimulus API, result schema, reproducibility
+checks and measured acceptance results. New installation instructions for
+Windows/uv and Docker are further down this page.
+
+## Build or inspect the v0.2 graph
 
 For graph setup, policy definitions, storage layout, queries, and acceptance
 checks, read [the Graph Core guide](docs/graph-core.md). The Windows/Docker body
@@ -46,21 +102,22 @@ For small graph fixtures without the full built graph:
 uv run pytest tests/test_graph.py -m "not graph" -q
 ```
 
-Two independent foundations in a Python 3.12 environment: raw **MaleCNS v1.0** data
+The Python 3.12 environment contains **MaleCNS v1.0**, the graph and neural model,
 and a **FlyGym 2.1 / MuJoCo 3.9** physical body. The CNS and body are **not connected yet**.
 The working directory may be named `flycns-sim`; the Python package is `malecns_sim`.
 
 ```text
 src/malecns_sim/
-├── cns/          Download / verify / load Feather tables / inspect MaleCNS
+├── cns/          Raw data inspection / census / deterministic anatomical graph
+├── neural/       Transmitter policy / Brian2 LIF / stimuli / spikes and rates
 └── simulation/   NeuroMechFly → FlatGroundWorld → MjModel / MjData → physics / render
 ```
 
-`cns/` applies no scientific filters, graph transformations, or neural dynamics.
-There is no selection by `Traced` status, synapse threshold, or neuron type; the
-released `minconf-0.5` files are read unchanged. `simulation/` does not access CNS
-data. Position actuators hold neutral targets; this version makes no claims
-about walking or biological behavior.
+The raw `CNSDataset` reader leaves released `minconf-0.5` tables unchanged.
+`cns/graph/` applies a documented node policy and preserves anatomical contact
+counts. Only `neural/` assigns transmitter signs and model weights.
+`simulation/` does not access CNS data. This version makes no claim about walking
+or biological behavior.
 
 ## Which workflow should I use?
 
@@ -445,13 +502,16 @@ session; it does not delete files. Docker Compose settings remain unchanged.
 ## Version boundary
 
 v0.1 supplies raw data access and the independent physical body. v0.2 supplies
-node policies, census auditing, and sparse COO/CSR connectivity. Work stops at
-Graph Core: LIF/GNN dynamics, transmitter signs, motor mapping, sensory coupling,
-closed-loop simulation, RL, CUDA, and Three.js remain outside this release.
+node policies, census auditing, and sparse COO/CSR connectivity. v0.3 adds the
+Shiu-derived Brian2 LIF engine, transmitter policy, scheduled stimuli, and spike
+results. Motor mapping, sensory coupling, closed-loop simulation, RL, GPU
+backends, GNN dynamics, and Three.js remain outside this release.
 
 ## References
 
 - [Official MaleCNS data distribution](https://male-cns.janelia.org/download/)
+- [Shiu et al. whole-brain model](https://pmc.ncbi.nlm.nih.gov/articles/PMC11446845/)
+- [Shiu reference implementation](https://github.com/philshiu/Drosophila_brain_model/blob/main/model.py)
 - [FlyGym v2.1.0 dependencies](https://github.com/NeLy-EPFL/flygym/blob/v2.1.0/pyproject.toml)
 - [FlyGym basic model composition](https://neuromechfly.org/tutorials/1a_basic_model_composition/)
 - [FlyGym rendering and interactive viewer](https://neuromechfly.org/api_reference/flygym/rendering/)
