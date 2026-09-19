@@ -1,4 +1,5 @@
 import numpy as np
+import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
@@ -43,3 +44,16 @@ def test_results_keep_parent_mapping_and_exact_counts(graph_factory, tmp_path):
         stream.write(b"corruption")
     with pytest.raises(ValueError, match="checksum"):
         validate_result(tmp_path / "two")
+
+
+def test_result_accepts_hashed_experiment_tables(graph_factory, tmp_path):
+    backend = Brian2LIFBackend(graph_factory(), seed=42)
+    backend.run(1)
+    summary = save_result(
+        backend,
+        tmp_path / "result",
+        experiment="catalogue-test",
+        extra_tables={"active_neurons.parquet": pa.table({"node_index": [0]})},
+    )
+    assert "active_neurons.parquet" in summary["artifacts"]
+    assert validate_result(tmp_path / "result") == summary
