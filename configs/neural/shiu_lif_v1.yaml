@@ -1,0 +1,22 @@
+model: shiu-lif-v1
+v_rest_mv: -52.0
+v_reset_mv: -52.0
+v_threshold_mv: -45.0
+tau_membrane_ms: 20.0
+tau_synapse_ms: 5.0
+refractory_ms: 2.2
+synaptic_delay_ms: 1.8
+weight_per_contact_mv: 0.275
+dt_ms: 0.1
+transmitter_sign:
+  acetylcholine: 1
+  gaba: -1
+  glutamate: -1
+  dopamine: 1
+  serotonin: 1
+  octopamine: 1
+unknown_nt_policy: zero
+stimulus:
+  type: poisson
+  rate_hz: 100.0
+  gain_mv: 68.75
