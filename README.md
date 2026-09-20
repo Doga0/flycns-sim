@@ -1,11 +1,70 @@
-# malecns-sim v0.4 — MaleCNS I/O Catalogue
+# malecns-sim v0.5 — One-way CNS → Body Motor Bridge
 
-v0.4 adds a versioned anatomical interface catalogue over the v0.2 graph. It
-answers which retained MaleCNS cells are sensory, motor, descending, ascending,
-intrinsic, endocrine, or other, while preserving every released annotation used
-to make that decision. v0.3 still provides the Shiu-derived Brian2 LIF engine.
-**The FlyGym/MuJoCo body remains independent:** no encoder, motor decoder,
-actuator mapping, sensory feedback, training, or CNS-to-joint connection exists.
+v0.5 replays real MaleCNS motor spikes through an explicit, versioned mapping
+into FlyGym position actuators. The default demonstration drives **one left
+front tibia joint**, using saved full-CNS LIF results from a real annotated leg
+proprioceptive population. An optional profile covers one tibia joint per leg.
+There is **no sensory feedback, closed loop, locomotion controller, or learning**.
+The decoder is an engineering approximation, not a biophysical muscle model.
+
+## Run the motor bridge
+
+Run commands from this repository's root. For first-time Git, uv, Docker,
+download, and graph setup, follow the installation sections below. These
+commands assume `published-v1` and its `io-v1` catalogue already exist.
+
+```powershell
+uv sync --locked
+
+# Audit all motor annotation fields and actual compiled actuator limits
+uv run python -m malecns_sim.bridge.motor_catalogue
+
+# Build the explicit 7-motor / 1-joint mapping (once)
+uv run python -m malecns_sim.bridge.build
+
+# Produce sensory-driven full-CNS spikes; skip if this run already exists
+uv run python -m malecns_sim.io.experiment --duration-ms 100 --rate-hz 100 --seed 42 --output outputs/io/bridge_sensory_seed42
+
+# Decode the saved spikes, replay physics and save six PNG frames
+uv run python -m malecns_sim.bridge.replay --neural-run outputs/io/bridge_sensory_seed42 --output outputs/bridge/lf_demo
+
+# Check hashes, causal timestamps, command bounds and finite physics
+uv run python -m malecns_sim.bridge.validate outputs/bridge/lf_demo
+```
+
+The replay writes `neural_activity.parquet`, `motor_activity.parquet`,
+`motor_commands.parquet`, `joint_states.parquet`, `provenance.json`,
+`report.json`, and `frames/*.png`. Open `report.json` for motor coverage and
+measured movement. `max_effect_vs_neutral_replay_rad` measures the difference
+from an identical physics replay holding neutral targets; simple displacement
+alone can also result from gravity and contact. No GUI window is opened.
+
+To watch the motor-driven fly in a **live MuJoCo window on Windows**, add
+`--viewer`. Use a new output directory on each run:
+
+```powershell
+uv run python -m malecns_sim.bridge.replay --neural-run outputs/io/leg_proprio_seed42_100ms --output outputs/bridge/lf_viewer --viewer --frames 0
+```
+
+This example uses the existing seed-42 experiment; substitute your own saved
+neural run if needed. The window repeatedly replays the actual motor commands
+at **0.1× speed** so the short movement is visible. Press **Space** to pause or
+resume; use the mouse to rotate, zoom and pan. Close the window to finish.
+`--playback-speed 1` selects real-time playback. Results are saved before the
+window opens, and viewer interaction does not change them. Run this locally;
+Docker remains headless. The separate `simulation.smoke_test --viewer` command
+shows the independent body and does not apply CNS motor commands.
+
+Builds and experiments refuse to overwrite existing directories. Reuse an
+existing neural run with `--neural-run`, or choose a new output directory.
+See [the Motor Bridge guide](docs/motor-bridge.md) for the no-stimulus control,
+six-leg profile, Docker commands, decoder equations, and provenance limitations.
+
+The released Feather has no separate exact muscle-target column, and this
+FlyGym model has no enabled tibia actuator/joint limits. Both facts are recorded:
+the mapping validates explicit cell IDs against curated type, side, subclass,
+exit nerve and neuromere; the decoder supplies separately labeled engineering
+bounds. It never guesses a mapping from a type-name substring.
 
 ## Start with the I/O catalogue
 
@@ -562,10 +621,11 @@ session; it does not delete files. Docker Compose settings remain unchanged.
 v0.1 supplies raw data access and the independent physical body. v0.2 supplies
 node policies, census auditing, and sparse COO/CSR connectivity. v0.3 adds the
 Shiu-derived Brian2 LIF engine, transmitter policy, scheduled stimuli, and spike
-results. Motor mapping, sensory coupling, closed-loop simulation, RL, GPU
-backends, GNN dynamics, and Three.js remain outside this release. v0.4 adds the
-I/O catalogue, exact queries, anatomy-aware spike reports, and a body channel
-inventory; it still defines no mapping across the CNS/body boundary.
+results. v0.4 supplies the I/O catalogue, exact queries, anatomy-aware spike
+reports and body channel inventory. v0.5 adds an explicit one-way motor bridge:
+saved motor spikes → rate decoder → bounded position targets → MuJoCo replay.
+Sensory encoding is v0.6; closed-loop embodiment is v0.7. Locomotion, RL,
+GPU backends, GNN dynamics and Three.js remain outside this release.
 
 ## References
 
