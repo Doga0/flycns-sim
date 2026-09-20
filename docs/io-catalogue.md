@@ -105,7 +105,7 @@ Sensory systems are normalized only from observed class values such as `visual`,
 `olfactory`, `gustatory`, `hygrosensory`, `thermosensory`, and the released
 mechanosensory classes. More detailed anatomy stays in raw `class`, `subclass`,
 `type`, `entryNerve`, and `receptorType` fields. MaleCNS does not provide a joint
-angle-to-firing-rate encoder; v0.5 must define and test that model assumption.
+angle-to-firing-rate encoder; v0.6 must define and test that model assumption.
 
 ## Query API and CLI
 
