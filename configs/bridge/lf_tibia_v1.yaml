@@ -1,0 +1,49 @@
+# Reviewed explicit IDs from MaleCNS v1.0; no runtime type parsing or auto-mapping.
+mapping_version: motor-bridge-v1
+control_dt_ms: 10.0
+channels:
+  - name: lf_tibia
+    body:
+      actuator: fly/lf_trochanterfemur-lf_tibia-pitch-position
+      joint: fly/lf_trochanterfemur-lf_tibia-pitch
+      side: L
+      leg: LF
+    male_cns:
+      flexor:
+        body_ids: [807165, 809912, 818057, 819384, 909831]
+        annotations:
+          type: Ti flexor MN
+          side: L
+          subclass: fl
+          exitNerve: ProLN
+          somaNeuromere: T1
+      extensor:
+        body_ids: [800636, 815344]
+        annotations:
+          type: Ti extensor MN
+          side: L
+          subclass: fl
+          exitNerve: ProLN
+          somaNeuromere: T1
+    decoder:
+      mode: antagonistic_rate
+      gain_rad: 0.35
+      r0_hz: 0.0
+      rmax_hz: 100.0
+      tau_ms: 20.0
+      max_delta_rad: 0.05
+      min_offset_rad: -0.35
+      max_offset_rad: 0.35
+      extensor_direction: 1
+    evidence:
+      source: malecns_annotation
+      confidence: explicit_population_annotations_manual_mechanical_hypothesis
+      reference: https://pmc.ncbi.nlm.nih.gov/articles/PMC12636603/
+      muscle_target: null
+      mechanical_assumption: >-
+        Curated Ti flexor/extensor populations and explicit side, subclass, exit nerve,
+        and soma neuromere support this tibia channel. Positive pitch is assigned to
+        extensor drive as an engineering convention; muscle moment arms, torque and
+        physiological polarity have not been calibrated. No exact muscle target column
+        is present in the released Feather. This is not a biophysical muscle model.
+
