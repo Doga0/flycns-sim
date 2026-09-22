@@ -1,11 +1,48 @@
-# malecns-sim v0.5 — One-way CNS → Body Motor Bridge
+# malecns-sim v0.6 — One-way Body → CNS Sensory Bridge
 
-v0.5 replays real MaleCNS motor spikes through an explicit, versioned mapping
-into FlyGym position actuators. The default demonstration drives **one left
-front tibia joint**, using saved full-CNS LIF results from a real annotated leg
-proprioceptive population. An optional profile covers one tibia joint per leg.
-There is **no sensory feedback, closed loop, locomotion controller, or learning**.
-The decoder is an engineering approximation, not a biophysical muscle model.
+v0.6 independently validates the opposite direction to v0.5: a controlled
+MuJoCo left-front tibia trajectory is sampled, encoded as input for explicitly
+annotated MaleCNS sensory cells, and replayed through the full-CNS LIF model.
+The resulting neural activity is recorded, including original MaleCNS body IDs.
+No neural motor output is applied to the body during this experiment. The two
+directions remain separate until the planned v0.7 closed-loop scheduler.
+
+## Run the sensory bridge
+
+Run these commands from the repository root after the raw graph and `io-v1`
+catalogue exist:
+
+```powershell
+uv sync --locked
+
+# Audit released sensory metadata, including LF/ProLN coverage
+uv run python -m malecns_sim.bridge.sensory_catalogue
+
+# Build the immutable, explicit 23-cell chordotonal mapping once
+uv run python -m malecns_sim.bridge.sensory.build
+
+# Zero-motion boundary control: must produce no sensory or downstream LIF spikes
+uv run python -m malecns_sim.bridge.sensory.replay `
+    --output outputs/sensory_bridge/lf_tibia_zero `
+    --zero-motion --mode explicit_spikes --seed 42
+
+# Moving-body demonstration: MuJoCo state → seeded Poisson sensory input → LIF
+uv run python -m malecns_sim.bridge.sensory.replay `
+    --output outputs/sensory_bridge/lf_tibia_poisson `
+    --mode poisson --seed 42
+
+# Validate artifact hashes, mapping provenance and finite neural output
+uv run python -m malecns_sim.bridge.sensory.validate outputs/sensory_bridge/lf_tibia_poisson
+```
+
+The first mapping intentionally selects only the 23 LF/ProLN cells explicitly
+annotated as `chordotonal organ`. It does not infer claw, hook, club, hair-plate
+or campaniform tuning from names. Its `linear_position_encoder_v1` is a recorded
+engineering assumption, not a biophysical FeCO model. See the
+[Sensory Bridge guide](docs/sensory-bridge.md) for the exact evidence, clocks,
+result files, deterministic mode, and Docker comparison.
+
+## v0.5 motor bridge (separate replay)
 
 ## Run the motor bridge
 
@@ -37,7 +74,8 @@ The replay writes `neural_activity.parquet`, `motor_activity.parquet`,
 `report.json`, and `frames/*.png`. Open `report.json` for motor coverage and
 measured movement. `max_effect_vs_neutral_replay_rad` measures the difference
 from an identical physics replay holding neutral targets; simple displacement
-alone can also result from gravity and contact. No GUI window is opened.
+alone can also result from gravity and contact. The default replay does not
+open a GUI window.
 
 To watch the motor-driven fly in a **live MuJoCo window on Windows**, add
 `--viewer`. Use a new output directory on each run:
@@ -624,8 +662,10 @@ Shiu-derived Brian2 LIF engine, transmitter policy, scheduled stimuli, and spike
 results. v0.4 supplies the I/O catalogue, exact queries, anatomy-aware spike
 reports and body channel inventory. v0.5 adds an explicit one-way motor bridge:
 saved motor spikes → rate decoder → bounded position targets → MuJoCo replay.
-Sensory encoding is v0.6; closed-loop embodiment is v0.7. Locomotion, RL,
-GPU backends, GNN dynamics and Three.js remain outside this release.
+v0.6 independently adds body state → explicit sensory encoder → full-CNS LIF
+replay; it never feeds the resulting motor activity back to MuJoCo. Closed-loop
+embodiment is v0.7. Locomotion, RL, GPU backends, GNN dynamics and Three.js
+remain outside this release.
 
 ## References
 
@@ -637,3 +677,5 @@ GPU backends, GNN dynamics and Three.js remain outside this release.
 - [FlyGym basic model composition](https://neuromechfly.org/tutorials/1a_basic_model_composition/)
 - [FlyGym body composition API](https://neuromechfly.org/api_reference/flygym/compose/fly/base_fly/)
 - [FlyGym rendering and interactive viewer](https://neuromechfly.org/api_reference/flygym/rendering/)
+- [FlyGym simulation state API](https://neuromechfly.org/api_reference/flygym/simulation/)
+- [Drosophila leg proprioceptive subtypes](https://pmc.ncbi.nlm.nih.gov/articles/PMC10644877/)
