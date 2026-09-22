@@ -1,0 +1,52 @@
+# v0.6: explicit sensory anatomy; the encoder is a separate model hypothesis.
+mapping_version: sensory-bridge-v1
+sensory_dt_ms: 1.0
+channels:
+  - name: lf_tibia_positive_position
+    source:
+      joint: fly/lf_trochanterfemur-lf_tibia-pitch
+      actuator: fly/lf_trochanterfemur-lf_tibia-pitch-position
+      signal: position
+    malecns:
+      # Every ID is released as mechanosensory/proprioceptive, chordotonal,
+      # left-sided, and entering through the prothoracic leg nerve (ProLN).
+      body_ids: [135305, 142571, 248280, 815569, 903843, 935541, 905037, 905335,
+                 817298, 902324, 906823, 906290, 906558, 912317, 815843, 817680,
+                 935383, 817839, 905339, 905340, 902359, 911316, 914116]
+      annotations:
+        class: mechanosensory_proprioceptive
+        subclass: chordotonal organ
+        side: L
+        entryNerve: ProLN
+    encoder:
+      type: linear_position_encoder_v1
+      # The lower endpoint is the compiled neutral LF-tibia angle. The upper
+      # endpoint is neutral + 0.35 rad. Negative positions clamp to zero.
+      min_value: 1.3089969389957472
+      max_value: 1.6589969389957472
+      min_rate_hz: 0.0
+      max_rate_hz: 100.0
+      gain_mv: 68.75
+    evidence:
+      source: malecns_annotation
+      confidence: explicit_lf_proln_chordotonal_population_position_probe
+      reference: https://pmc.ncbi.nlm.nih.gov/articles/PMC10644877/
+      annotation_fact: >-
+        This local MaleCNS release explicitly gives class, subclass, side and
+        entry nerve, but does not identify these particular bodies as claw,
+        hook or club cells.
+      model_assumption: >-
+        A shared, one-sided linear positive-position-to-rate transfer function
+        is an engineering input probe. It is not a biophysical FeCO model,
+        measured tuning curve, or a motor/body closed loop.
+trajectory:
+  name: lf_tibia_position_probe_v1
+  # Offsets from the compiled neutral target. Negative/positive are MuJoCo
+  # axis conventions; their flexion/extension interpretation is not calibrated.
+  keyframes:
+    - {t_ms: 0.0, target_offset_rad: 0.0}
+    - {t_ms: 100.0, target_offset_rad: 0.0}
+    - {t_ms: 300.0, target_offset_rad: -0.25}
+    - {t_ms: 500.0, target_offset_rad: 0.0}
+    - {t_ms: 700.0, target_offset_rad: 0.25}
+    - {t_ms: 800.0, target_offset_rad: 0.0}
