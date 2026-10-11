@@ -1,3 +1,3 @@
-"""MaleCNS and FlyGym with separately validated one-way sensory/motor bridges."""
+"""MaleCNS and FlyGym with explicit bridges and causal closed-loop orchestration."""
 
-__version__ = "0.6.0"
+__version__ = "0.7.0.dev0"

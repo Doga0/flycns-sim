@@ -412,7 +412,7 @@ wheels = [
 
 [[package]]
 name = "malecns-sim"
-version = "0.6.0"
+version = "0.7.0.dev0"
 source = { editable = "." }
 dependencies = [
     { name = "brian2" },

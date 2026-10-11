@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "malecns-sim"
-version = "0.6.0"
-description = "MaleCNS graph, LIF engine, and separately validated sensory/motor body bridges."
+version = "0.7.0.dev0"
+description = "MaleCNS LIF and causal closed-loop body orchestration with explicit acceptance gates."
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
@@ -36,6 +36,7 @@ packages = ["src/malecns_sim"]
 "configs/neural" = "malecns_sim/neural/profiles"
 "configs/io" = "malecns_sim/io/profiles"
 "configs/bridge" = "malecns_sim/bridge/profiles"
+"configs/closed_loop" = "malecns_sim/bridge/closed_loop/profiles"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
