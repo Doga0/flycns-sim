@@ -1,4 +1,34 @@
-# malecns-sim v0.6 — One-way Body → CNS Sensory Bridge
+# malecns-sim v0.7 development — Closed-loop orchestration
+
+The stateful LF tibia scheduler now combines the existing sensory and motor
+bridges. **The requested real-data embodiment acceptance has not passed:** the
+200 ms, +0.20 rad, seed-42 perturb-and-release experiment produced 8 sensory
+input events and 9 CNS spikes, but zero spikes in the seven mapped LF tibia
+motor cells. Feedback-on, feedback-off and sensory-clamp body trajectories were
+identical. The package is therefore `0.7.0.dev0`, not a completed v0.7 milestone.
+
+Run from the repository root with the existing graph, I/O catalogue, `bridge-v1`
+and `sensory-bridge-v1` artifacts:
+
+```powershell
+uv sync --locked
+uv run python -m malecns_sim.bridge.closed_loop.runner `
+    --config configs/closed_loop/lf_tibia_v1.yaml `
+    --output outputs/closed_loop/lf_tibia_demo
+
+# Validate all three matched conditions and print the measured feedback effect.
+uv run python -m malecns_sim.bridge.closed_loop.validate outputs/closed_loop/lf_tibia_demo
+
+# Strict milestone gate: exits 1 if no mapped-motor physical feedback is measured.
+uv run python -m malecns_sim.bridge.closed_loop.validate outputs/closed_loop/lf_tibia_demo --require-effect
+```
+
+Every run uses a new output directory. The final command is expected to fail
+with the unchanged default model/mappings because the measured effect is zero.
+See [the Closed-loop guide](docs/closed-loop.md) for causal timing, monitoring,
+engineering guards, recorded evidence, compatibility tests, and Docker use.
+
+## v0.6 sensory bridge (independent replay)
 
 v0.6 independently validates the opposite direction to v0.5: a controlled
 MuJoCo left-front tibia trajectory is sampled, encoded as input for explicitly
@@ -663,9 +693,10 @@ results. v0.4 supplies the I/O catalogue, exact queries, anatomy-aware spike
 reports and body channel inventory. v0.5 adds an explicit one-way motor bridge:
 saved motor spikes → rate decoder → bounded position targets → MuJoCo replay.
 v0.6 independently adds body state → explicit sensory encoder → full-CNS LIF
-replay; it never feeds the resulting motor activity back to MuJoCo. Closed-loop
-embodiment is v0.7. Locomotion, RL, GPU backends, GNN dynamics and Three.js
-remain outside this release.
+replay. The v0.7 development scheduler combines the bridges causally, but its
+real-data physical-feedback acceptance is still unmet with the unchanged LF
+profile. Locomotion, RL, GPU backends, GNN dynamics and Three.js remain outside
+this work.
 
 ## References
 
