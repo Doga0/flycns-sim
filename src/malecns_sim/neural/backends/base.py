@@ -78,6 +78,30 @@ class NeuralGraph:
 
 
 class NeuralBackend(ABC):
+    @property
+    def time_ms(self) -> float:
+        raise NotImplementedError
+
+    @property
+    def total_spikes(self) -> int:
+        """Count all CNS spikes, regardless of diagnostic recording selection."""
+        raise NotImplementedError
+
+    def configure_event_input(self, nodes, gains_mv) -> None:
+        """Declare allowed local input nodes and fixed per-node external gains."""
+        raise NotImplementedError
+
+    def inject_events(self, events) -> None:
+        """Queue local node_index/t_ms events for the next advance window."""
+        raise NotImplementedError
+
+    def advance(self, duration_ms: float) -> None:
+        self.run(duration_ms)
+
+    def spikes_since(self, cursor):
+        """Return ((times_ms, local_indices), next_cursor), without replaying history."""
+        raise NotImplementedError
+
     @abstractmethod
     def reset(self, seed: int | None = None) -> None: ...
 
