@@ -15,8 +15,8 @@ Read this file fully before changing anything.
    the code and git history win. If they disagree, fix the doc in the same change.
 3. Read the feature guide for the layer you touch (`docs/graph-core.md`,
    `docs/neural-reference.md`, `docs/io-catalogue.md`, `docs/motor-bridge.md`,
-   `docs/sensory-bridge.md`, `docs/closed-loop.md`). They hold exact commands, schemas and
-   measured results.
+   `docs/sensory-bridge.md`, `docs/closed-loop.md`, `docs/pathway-audit.md`). They hold
+   exact commands, schemas and measured results.
 4. Explore before editing: follow imports from the entry point (`python -m malecns_sim.<…>`)
    down to the code you change, and read the existing tests for it.
 
@@ -34,11 +34,15 @@ Read this file fully before changing anything.
   a result, choose a "lucky" seed, inject artificial motor spikes into real-data runs, or
   relabel other motor cells to make an acceptance gate pass. New mappings use explicit,
   reviewed body IDs in a versioned YAML profile. See DECISIONS.md D5–D8.
+- **Current phase is v0.7.x (diagnostic).** The owner closed v0.7 at `0.7.0.dev0`; do not
+  tag `0.7.0`, do not debug v0.7 to force motor spikes, and do not add simulator features
+  until the pathway investigation reports (DECISIONS.md D17, ROADMAP §2).
 - **Label assumptions.** Engineering conventions (decoder gains, encoder transfer functions,
   actuator bounds, safety guards) are labeled as such in configs and reports. Do not
   describe them as biological facts.
 - **Keep layer boundaries.** `cns/` never assigns signs or dynamics; `neural/` never touches
-  MuJoCo; `simulation/` never reads CNS data; only `bridge/` couples them.
+  MuJoCo; `simulation/` never reads CNS data; only `bridge/` couples them; `analysis/` is
+  read-only diagnostics and never edits profiles or artifacts.
 - **Versioned profiles are immutable once results depend on them.** Changing the behavior of
   `configs/*/…_v1.yaml` invalidates recorded hashes (`expected_lif_config_sha256`, mapping
   manifests). Add a `_v2` profile instead.
