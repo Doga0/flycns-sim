@@ -21,7 +21,7 @@ console-script entry point. Paths below are relative to `src/malecns_sim/` unles
 ```
 
 Dependency rules (verified from imports): `cns` depends on nothing internal; `neural`
-depends on `cns.graph.store`; `io` depends on `cns`; `simulation` imports nothing from
+depends on `cns.graph.store`; `io` depends on `cns`; `analysis` uses `cns`, `neural` and `bridge.store` only; `simulation` imports nothing from
 `cns` except `cns.graph.store.write_json` in `body_io.py`; `bridge` depends on all of them.
 The body is never driven by anything except `bridge/controller.py`.
 
@@ -63,7 +63,7 @@ add a fixed gain directly to `v` (68.75 mV by default, enough to force a spike f
 Everything uses Brian2 `NumpyCodeObject` (no compiled code generation).
 
 Backend contract (`NeuralBackend`): `reset`, `schedule`, `stimulate`, `silence`, `run`,
-`get_spikes` (abstract, v0.3), plus the v0.7 incremental API, which is **uncommitted**:
+`get_spikes` (abstract, v0.3), plus the v0.7 incremental API:
 `time_ms`, `total_spikes`, `configure_event_input(nodes, gains_mv)`,
 `inject_events(events)`, `advance(duration_ms)`, `spikes_since(cursor)`. The Brian2
 implementation keeps one persistent `SpikeGeneratorGroup` for event input, refuses past,
@@ -116,7 +116,7 @@ Sensory direction (body → CNS), `bridge/sensory/`:
 | `sensory/replay.py` | Offline: drive the body through a keyframed trajectory, encode, run full-CNS LIF |
 | `sensory/validate.py` | Mapping/run validation, Windows/Docker comparison |
 
-### `bridge/closed_loop/`: causal orchestration (v0.7, uncommitted)
+### `bridge/closed_loop/`: causal orchestration (v0.7)
 
 | File | Responsibility |
 | --- | --- |
@@ -128,6 +128,18 @@ Sensory direction (body → CNS), `bridge/sensory/`:
 
 Config: `configs/closed_loop/lf_tibia_v1.yaml` (200 ms, seed 42, Poisson encoder,
 `control_and_sensory` monitor, +0.20 rad initial tibia offset, safety limits).
+
+### `analysis/`: read-only diagnostics (v0.7.x, uncommitted)
+
+| File | Responsibility |
+| --- | --- |
+| `analysis/sensory_motor_paths.py` | `Connectivity` (COO + CSR views), `hop_distances`, `walk_counts` (walks per hop and sign class), `enumerate_paths`, `direct_drive_estimate`, `psp_peak_per_mv` |
+| `analysis/pathway_audit.py` | CLI: populations from bridge profiles → `nodes/edges/paths.parquet`, `pathway_summary.json`, `report.json` |
+| `analysis/pathway_report.py` | CLI: joins an audit and a sweep (hash-checked) → delivered drive per motor neuron by sign/NT/layer, active neurons, benchmark JSON and Markdown |
+| `analysis/activation_sweep.py` | CLI: drive the sensory population (volleys, Poisson rates) in the full LIF, no body → motor spike/latency matrix, layer activity |
+
+Depends on `cns.graph`, `neural` and `bridge.store`. The audit runs no dynamics; the sweep
+runs the LIF only. Neither touches the body or changes a profile. Guides: [pathway-audit.md](pathway-audit.md), [lf-tibia-pathway-report.md](lf-tibia-pathway-report.md).
 
 ## Closed-loop data flow (one 1 ms tick)
 

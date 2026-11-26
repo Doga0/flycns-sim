@@ -144,3 +144,33 @@ New decisions: append an entry with date, evidence, rationale, trade-offs.
   Ti flexor/extensor populations and FeCO inputs on the same side and nerve).
 - Why 200 ms and +0.20 rad for the v0.7 experiment.
 - Whether the previous developer intended a v2 encoder/mapping policy to fix the v0.7 gate.
+
+---
+
+### D17. Close v0.7 as infrastructure; investigate the pathway before v0.8 (2026-10-11)
+- **Decided by:** the owner (Berke), in the project chat on 2026-10-11.
+- **Decision:** v0.7 is a successful closed-loop infrastructure release with a failed
+  biological/functional acceptance. Version stays `0.7.0.dev0` and is never tagged `0.7.0`
+  for this result. No more debugging of v0.7 to make motor spikes appear, and no new
+  simulator features in v0.7.x. Next comes a diagnostic investigation (pathway audit,
+  MuJoCo-free rate sweep, latency/connectivity report) whose result decides v0.8:
+  physical sensory-motor validation if the pathway works under the current model, otherwise
+  reviewed interface/model calibration. Walking and RL come after a validated single-leg
+  interface and multi-leg embodiment.
+- **Rationale (stated by the owner):** keep "does the software coupling work" (yes) separate
+  from "does this sensory population + encoder + LIF parameters + motor population form a
+  functional pathway" (not shown). Forcing the 0-spike result away would harm the
+  project's scientific credibility; RL on top of unknown mappings would be uninterpretable.
+- **Constraints:** diagnostics must not add biological assumptions; report what the current
+  sign policy does; do not interpret sweep results as biology.
+
+### D18. Pathway audit counts walks for multiplicity and enumerates short paths explicitly (2026-10-11)
+- **Evidence:** `src/malecns_sim/analysis/sensory_motor_paths.py`.
+- **Decision:** path multiplicity for 1–5 synapses is computed by propagating counts along
+  all graph edges (walks, so a node may repeat), split into sign classes under the current
+  LIF sign policy. Individual paths are listed exhaustively only up to a smaller hop count
+  (default 3), because the LF tibia case has about 167 thousand walks of ≤3 synapses but
+  33 million of 4 and 7.7 billion of 5. Latency is the synaptic-delay lower bound
+  (hops × 1.8 ms); measured latency belongs to the activation sweep.
+- **Trade-off:** walk counts overstate simple-path counts where cycles exist; the enumerated
+  table flags non-simple paths so the difference is visible for short paths.

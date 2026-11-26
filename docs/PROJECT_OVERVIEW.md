@@ -66,8 +66,9 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for module-level detail.
 | v0.3 | Brian2 LIF engine, transmitter policy, stimuli, results |
 | v0.4 | I/O catalogue, exact queries, body channel inventory |
 | v0.5 | One-way motor bridge: saved spikes → decoder → MuJoCo replay |
-| v0.6 | One-way sensory bridge: body state → encoder → full-CNS LIF replay (last commit, `0.6.0`) |
-| v0.7.0.dev0 | Closed-loop scheduler (uncommitted; acceptance not met) |
+| v0.6 | One-way sensory bridge: body state → encoder → full-CNS LIF replay (`0.6.0`) |
+| v0.7.0.dev0 | Closed-loop scheduler (committed; acceptance not met, closed as infrastructure) |
+| v0.7.x | Pathway investigation: audit tool (`analysis/`), activation sweep next |
 
 ## Terminology
 

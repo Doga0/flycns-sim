@@ -8,9 +8,21 @@ saved artifacts but not re-run; **[inferred]** reasoned from evidence; **[unknow
 
 ## Current stage
 
-v0.6.0 is committed and merged (`main` at `0d41abb`). **v0.7 (closed loop) is implemented
-but uncommitted, and its scientific acceptance gate fails.** The package version in the
+v0.7 (closed loop) is committed on `main` (HEAD `4a49f3c`); **its scientific acceptance
+gate fails.** The package version in the
 working tree is `0.7.0.dev0`.
+
+**Owner decision (Berke, 2026-10-11):** v0.7 is closed as a *successful infrastructure
+release with a failed biological/functional acceptance*. It stays `0.7.0.dev0` and must
+**not** be tagged `0.7.0`. Do not keep debugging v0.7 to force motor spikes, and do not add
+new simulator features in v0.7.x. The current phase is **v0.7.x pathway investigation**
+(ROADMAP §2): pathway audit, then a MuJoCo-free sensory rate sweep, then a latency and
+connectivity report. That result decides what v0.8 contains (DECISIONS.md D17).
+
+v0.7 boundary as stated by the owner: done are the persistent LIF, incremental spikes,
+causal scheduler, body→CNS, the CNS→body mechanism, clock sync, safety guards, provenance,
+Docker reproducibility, v0.5/v0.6 regressions, the synthetic closed loop and the real
+MaleCNS experiment. Not done: real MaleCNS physical feedback.
 
 ## Implemented and verified
 
@@ -23,8 +35,8 @@ working tree is `0.7.0.dev0`.
 | I/O catalogue + anatomy-aware experiments (v0.4) | done | `tests/io/*` pass [verified]; role counts in `io-v1/role_counts.json` [verified] |
 | One-way motor bridge + replay + viewer (v0.5) | done | `tests/bridge/test_motor_bridge.py`, `test_viewer.py` pass [verified]; LF profile maps 7 cells, six-leg profile 49 [verified from manifests] |
 | One-way sensory bridge + replay (v0.6) | done | `tests/bridge/sensory/test_encoder.py` pass [verified]; 23 mapped cells [verified from manifest] |
-| Incremental neural API (v0.7) | done, uncommitted | `tests/neural/test_incremental.py` 3 tests pass [verified] |
-| Closed-loop scheduler, runner, recorder, validator (v0.7) | software done, uncommitted | `tests/bridge/test_closed_loop.py` pass, including a synthetic 3-neuron graph where feedback changes the trajectory [verified] |
+| Incremental neural API (v0.7) | done | `tests/neural/test_incremental.py` 3 tests pass [verified] |
+| Closed-loop scheduler, runner, recorder, validator (v0.7) | software done | `tests/bridge/test_closed_loop.py` pass, including a synthetic 3-neuron graph where feedback changes the trajectory [verified] |
 | Windows ↔ Docker reproduction of the v0.7 run | passes on saved artifacts | `closed_loop.validate outputs/closed_loop/lf_tibia_seed42 --compare outputs/closed_loop/lf_tibia_docker_seed42` → `reproduction_passed: true` [verified, 2026-10-11] |
 
 ## In progress / incomplete
@@ -93,66 +105,111 @@ Result [verified, 2026-10-11, 8 min 16 s wall time on Windows]: all three condit
 `reproduction_passed: true` (exact events/commands, 1e-9 body tolerance). So the current
 working-tree code reproduces the recorded 2026-09-22 result.
 
-## Git state (2026-10-11)
+## Git state (2026-10-12)
 
-- Branch `main`, up to date with `origin/main` (`https://github.com/Doga0/flycns-sim`).
-  HEAD `0d41abb` "Merge feat/sensory-bridge branch into main" (2026-09-22). 55 commits.
-- All `feat/*` branches (`graph-core`, `lf-neural-dynamics`, `io-catalogue`,
-  `one-way-motor-bridge`, `sensory-bridge`) and `init` are merged into `main`.
-- No stashes.
-- **Uncommitted, must be preserved** (all v0.7 work):
-  - Modified: `README.md` (v0.7 header section), `pyproject.toml` (version
-    `0.7.0.dev0`, description, closed_loop profile packaging), `uv.lock` (version only),
-    `src/malecns_sim/__init__.py` (version), `neural/backends/base.py` (incremental API),
-    `neural/backends/brian2_lif.py` (event input, selective monitor, cursors).
-  - Untracked: `configs/closed_loop/`, `docs/closed-loop.md`,
-    `src/malecns_sim/bridge/closed_loop/`, `tests/bridge/test_closed_loop.py`,
-    `tests/neural/test_incremental.py`.
-  - Added by this audit (untracked): `AGENTS.md`, `CLAUDE.md`, `docs/PROJECT_OVERVIEW.md`,
-    `docs/ARCHITECTURE.md`, `docs/PROJECT_STATE.md`, `docs/ROADMAP.md`, `docs/DECISIONS.md`.
-  - New git-ignored output from this audit: `outputs/closed_loop/lf_tibia_seed42_recheck_2026-10-11/`.
+- Branch `main`, in sync with `origin/main` (`https://github.com/Doga0/flycns-sim`).
+  HEAD `4a49f3c` "project docs for agents".
+- The owner committed the v0.7 work directly to `main` and pushed it on 2026-10-11
+  (`73f9f8c`..`4230a40`: closed-loop package, config, guide, incremental neural API,
+  tests, version `0.7.0.dev0`), plus the bootstrap docs in `4a49f3c`. No tag.
+- All earlier `feat/*` branches and `init` are merged. No stashes.
+- **Uncommitted (v0.7.x pathway audit, preserve):**
+  - Modified: `AGENTS.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`,
+    `docs/PROJECT_STATE.md`, `docs/ROADMAP.md`.
+  - Untracked: `src/malecns_sim/analysis/` (pathway audit, activation sweep, pathway
+    report), `tests/analysis/`, `docs/pathway-audit.md`, `docs/lf-tibia-pathway-report.md`.
+- Git-ignored outputs from this work: `outputs/closed_loop/lf_tibia_seed42_recheck_2026-10-11/`,
+  `outputs/analysis/lf_tibia_pathway/`, `outputs/analysis/lf_tibia_activation_sweep/`,
+  `outputs/analysis/lf_tibia_pathway_report/`, `outputs/analysis/lf_tibia_sweep_robustness/`,
+  `outputs/analysis/lf_tibia_subset_sweep/` (2026-11-09).
+- 2026-11-09: `tests/analysis` 18 passed (`uv run --frozen pytest tests/analysis -q`);
+  `ruff check` / `ruff format --check` clean on `src/malecns_sim/analysis` and
+  `tests/analysis`. Full suite not re-run.
 
-## Recommended next task
+## Current task: v0.7.x pathway investigation (owner plan, 2026-10-11)
 
-**Diagnose why LF chordotonal input does not drive the mapped LF tibia motor neurons**
-(ROADMAP 2.1). This is a recommendation from the evidence; the previous developer's
-intended next step is unknown. Do step 0 first, or get the owner's go-ahead to skip it.
+The owner set this sequence. It is diagnostic work: report what the current graph and LIF
+policy do, do not add biological assumptions, do not change v1 profiles, and do not read the
+sweep results as biological fact.
 
-0. (Owner decision) Commit the uncommitted v0.7 work to a `feat/closed-loop` branch
-   (ROADMAP 1.1).
-1. Static path analysis on `published-v1` with the shiu-lif-v1 signs: direct and 2-hop
-   signed effective weights from the 23 sensory cells to the 7 motor cells; how many
-   intermediate nodes have sign 0 (unknown NT); maximum depolarization reachable in `g`
-   from realistic input patterns.
-2. Diagnostic simulations in **new output directories** with **temporary diagnostic
-   configs** outside `configs/`, never editing v1 profiles: sweep sensory drive (all 23
-   cells at fixed rates, longer duration), perturbation offset/duration, and `monitor: full`
-   to see where activity dies out. Report rates of the mapped motor cells.
-3. Summarize which factor(s) block the path and propose candidate v2 policy changes with
-   justification for the owner (ROADMAP 2.2).
+1. **Pathway audit** (`malecns_sim.analysis.pathway_audit`): anatomical paths of 1 to 5
+   synapses from the 23 LF/ProLN chordotonal cells to the 7 mapped LF tibia motor neurons.
+   For each path: source, target, hop count, contacts, transmitter and model sign per
+   neuron, type, side, intermediate population, multiplicity and synaptic-delay latency.
+   Done; see "Pathway audit status" below.
+2. **Functional activation sweep** without MuJoCo: drive the 23 sensory cells directly
+   (single spikes, volleys, and 10–1000 Hz rates) in the full LIF model and record the
+   spikes, first-spike latency and spike count of each mapped motor neuron. Done.
+3. **Latency and connectivity report** combining 1 and 2: path depth, transmitter mix,
+   latency and minimum input for motor activation. Done.
+4. Only then design v0.8: "physical sensory-motor validation" if the pathway works under the
+   current model, otherwise "reviewed interface/model calibration".
 
-Files likely affected: new diagnostic script(s), for example `src/malecns_sim/bridge/closed_loop/diagnose.py`
-or `scripts/` (choose one and document it); `docs/closed-loop.md` (findings section);
-`docs/PROJECT_STATE.md`, `docs/DECISIONS.md`, `docs/ROADMAP.md`. Read-only use of
-`neural/signs.py`, `cns/graph/store.py`, `bridge/sensory/*`, `bridge/mapping.py`.
+Acceptance for steps 1–3 (owner's question): *given this sensory population and this motor
+population, under the current MaleCNS graph and LIF model, what input is required to
+activate the motor population?* Outputs: minimum input rate, motor activation latency,
+active motor neurons, spike count, path depth, path connectivity. All runs go to new output
+directories with provenance; no tracked v1 config, weight, sign policy or mapping changes;
+the existing tests keep passing.
 
-Acceptance criteria:
-- A reproducible command (documented in `docs/closed-loop.md`) produces the path analysis
-  and the sweep results, with provenance, in new output directories.
-- The report quantifies, for the default v1 setup, the drive reaching each of the 7 mapped
-  motor cells (direct and via ≤2 hops) and identifies at least one factor whose change
-  produces mapped-motor spikes, or shows that none of the tested factors does.
-- No tracked v1 config, weight, sign policy or mapping is modified; the existing 116 tests
-  still pass; `ruff check` reports no new errors.
-- Findings are recorded as facts vs. inferences in `docs/closed-loop.md` and summarized in
-  this file, with proposed v2 options listed in ROADMAP 2.2 for the owner to decide.
+### Pathway audit status
+
+Step 1 done (2026-10-11), uncommitted. Tool: `src/malecns_sim/analysis/` (new package),
+tests `tests/analysis/` (16 passed; full suite 132 passed on 2026-10-12). Guide and full numbers:
+[pathway-audit.md](pathway-audit.md). Output: `outputs/analysis/lf_tibia_pathway/`.
+
+Headline facts: all 7 motor neurons are reachable, 6 by a direct synapse (11 excitatory
+ACh pairs, at most 39 contacts onto one neuron) and 819384 at 2 hops. 2-hop paths: 538
+excitatory, 494 net inhibitory, 20 muted. Only 3% of on-path intermediates are muted by the
+zero-sign policy. A linear direct-drive estimate puts the best-connected motor neuron
+(807165) at threshold only when its 3 direct sources fire at about 131 Hz together.
+Inference to test in step 2: the pathway exists anatomically, and the v0.7 input (8 events
+in 200 ms) was far too weak for it.
+
+Step 2 done (2026-10-12), uncommitted: `python -m malecns_sim.analysis.activation_sweep`,
+output `outputs/analysis/lf_tibia_activation_sweep/`, details in
+[pathway-audit.md](pathway-audit.md#step-2-functional-activation-sweep-2026-10-12).
+Facts: with no input nothing fires. Poisson 10–50 Hz to all 23 sensory cells drives no
+mapped motor neuron. 100 Hz nominal (87 Hz actual) and above, or a 10-volley burst, drives
+**only flexors 807165 and 809912**; the other 3 flexors and both extensors never fire up to
+1000 Hz. Activity never passes beyond 2 synapses from the sensory cells. First motor latency
+ranges from 51 ms (100 Hz) to about 14 ms.
+
+Step 3 done (2026-10-12), uncommitted: `python -m malecns_sim.analysis.pathway_report`,
+output `outputs/analysis/lf_tibia_pathway_report/`, written up in
+[lf-tibia-pathway-report.md](lf-tibia-pathway-report.md). New fact: at the strongest input
+**both extensors receive net inhibition** (mostly from GABA-labeled 1-hop interneurons), and
+the two active flexors get more excitation via 1-hop interneurons than directly from the
+sensory cells.
+
+**Next: the owner decides the v0.8 scope (ROADMAP 2.4).** The evidence supports
+"physical sensory-motor validation" (the pathway works without weight or sign changes)
+but raises three interface questions: how to reach about 87 Hz per sensory cell, whether a
+flexor-only response is acceptable, and how the decoder should normalize when 2 of 5
+flexors fire. See the report's last section and the proposal in
+[v0.8-proposal.md](v0.8-proposal.md). A robustness sweep (seeds 42–46, rates 50–200 Hz, 500 ms
+drive, `outputs/analysis/lf_tibia_sweep_robustness/`) showed a soft threshold: sporadic motor
+spikes at 50–90 Hz, 5–14 spikes at 100 Hz (latency 51–208 ms), 25–38 at 200 Hz (22–39 ms);
+extensors silent in all 35 runs. The v1 encoder saturates at 100 Hz, which bounds what a
+v1-based v0.8 protocol can reach.
+
+**Silent motor neurons explained (2026-11-09, uncommitted):** `activation_sweep` gained
+`--sensory-subset` (explicit profile body IDs). A full-CNS input census and a subset sweep
+(`outputs/analysis/lf_tibia_subset_sweep/{snpp51,snpp50,snpp39,all_but_snpp51}`) show:
+the whole flexor response comes from the 3 SNpp51 cells (alone they give 20/14 spikes in
+807165/809912 and 1 spike each in 818057 and 909831 at 1000 Hz); the other 20 cells are net
+inhibitory and drive nothing; no subset excites the extensors meaningfully; and 75–89% of
+each motor neuron's excitatory input comes from premotor partners this input never
+activates. This is not a pipeline bug. Details in
+[pathway-audit.md](pathway-audit.md#why-5-of-7-motor-neurons-stay-silent-2026-11-09). It adds
+to the v0.8 decision: the one-population encoder mixes opposing sensory channels.
 
 ## Unknowns that need human input
 
-1. Should the uncommitted v0.7 work be committed, and on which branch?
-2. Which v2 changes (encoder, gain, populations, protocol, actuator stiffness, NT policy)
-   are scientifically acceptable for passing the gate? What counts as a pass beyond
-   "any mapped-motor effect"?
+1. (Resolved 2026-10-11: the owner committed v0.7 to `main`.)
+2. v0.8 scope: physical sensory-motor validation or interface/model calibration? The
+   investigation has reported (lf-tibia-pathway-report.md); this is now the open decision,
+   including whether flexor-only activation is an acceptable first criterion.
 3. Has the Windows MuJoCo viewer been verified manually? README says no, but
    `outputs/bridge/lf_viewer_live` and `six_leg_viewer_live` exist.
 4. Were the 2026-09-22 Docker outputs produced from the final code?
