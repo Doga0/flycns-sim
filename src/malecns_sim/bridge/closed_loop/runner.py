@@ -13,6 +13,7 @@ import numpy as np
 import yaml
 
 from malecns_sim.bridge.closed_loop.clocks import Clocks, steps
+from malecns_sim.bridge.closed_loop.perturbation import JointTorque
 from malecns_sim.bridge.closed_loop.recorder import save_run
 from malecns_sim.bridge.closed_loop.scheduler import ClosedLoopScheduler, MuJoCoBody
 from malecns_sim.bridge.closed_loop.validate import compare_conditions, validate_run
@@ -45,7 +46,7 @@ def body_fingerprint(model):
 
 
 def prepare(config):
-    if config["version"] != "closed-loop-lf-tibia-v1":
+    if config["version"] not in {"closed-loop-lf-tibia-v1", "closed-loop-lf-tibia-load-v2"}:
         raise ValueError("Unknown closed-loop configuration")
     clocks = Clocks(**config["clocks"])
     steps(config["duration_ms"], clocks.motor_dt_ms)
@@ -83,6 +84,15 @@ def prepare(config):
         or sensory.channels[0]["source"]["joint"] != joint
     ):
         raise ValueError("Motor/sensory/initial joint identities differ")
+    perturbation = JointTorque.from_config(config.get("perturbation"), sim.model)
+    if config["version"] == "closed-loop-lf-tibia-v1" and perturbation is not None:
+        raise ValueError("v1 closed-loop profile cannot add an external torque")
+    if config["version"] == "closed-loop-lf-tibia-load-v2" and perturbation is None:
+        raise ValueError("Load-v2 requires an external torque")
+    if perturbation is not None and (
+        perturbation.joint != joint or perturbation.stop_ms > config["duration_ms"]
+    ):
+        raise ValueError("External torque joint/timing differs from experiment")
     if (
         lif.dt_ms != clocks.neural_dt_ms
         or sim.model.opt.timestep * 1000 != clocks.physics_dt_ms
@@ -116,6 +126,7 @@ def prepare(config):
             "joint": joint,
             "actuator": motor.channels[0]["body"]["actuator_name"],
         },
+        "external_perturbation": None if perturbation is None else vars(perturbation),
         "versions": {
             n: importlib.metadata.version(n)
             for n in ("malecns-sim", "brian2", "mujoco", "flygym", "numpy")
@@ -132,14 +143,27 @@ def prepare(config):
             or manifest["catalogue_manifest"] != provenance["catalogue_manifest"]
         ):
             raise ValueError("Cross-bridge graph/catalogue hash mismatch")
-    return clocks, lif, catalogue, motor, sensory, provenance
+    return clocks, lif, catalogue, motor, sensory, perturbation, provenance
 
 
-def run_experiment(config, output, *, conditions=("feedback_off", "sensory_clamp", "feedback_on")):
+def run_experiment(config, output, *, conditions=None):
     output = Path(output)
     if output.exists():
         raise FileExistsError(output)
-    clocks, lif, catalogue, motor, sensory, provenance = prepare(config)
+    clocks, lif, catalogue, motor, sensory, perturbation, provenance = prepare(config)
+    if conditions is None:
+        conditions = (
+            ("feedback_off", "sensory_clamp", "motor_clamp", "feedback_on")
+            if perturbation is not None
+            else ("feedback_off", "sensory_clamp", "feedback_on")
+        )
+    if len(set(conditions)) != len(conditions) or not set(conditions) <= {
+        "feedback_off",
+        "sensory_clamp",
+        "motor_clamp",
+        "feedback_on",
+    }:
+        raise ValueError("Unknown/repeated experiment condition")
     with CNSGraph.load(config["graph"]) as stored, stage_output(output) as stage:
         validate_graph(stored)
         graph = NeuralGraph.from_graph(stored)
@@ -179,7 +203,9 @@ def run_experiment(config, output, *, conditions=("feedback_off", "sensory_clamp
                 b"".join(getattr(sim.data, n).tobytes() for n in ("qpos", "qvel", "ctrl", "act"))
             ).hexdigest()
             controller = BodyController(motor, sim.model)
-            body = MuJoCoBody(sim, reader, controller, clocks, config["safety"], neutral)
+            body = MuJoCoBody(
+                sim, reader, controller, clocks, config["safety"], neutral, perturbation
+            )
             neural = Brian2LIFBackend(graph, lif, seed=config["seed"], spike_record_nodes=recording)
             neural.configure_event_input(list(gains), list(gains.values()))
             snapshots = []
@@ -218,17 +244,21 @@ def run_experiment(config, output, *, conditions=("feedback_off", "sensory_clamp
             ).run(config["duration_ms"])
             p = {**provenance, "condition": condition, "initial_state_sha256": initial_hash}
             reports[condition] = save_run(stage / condition, scheduler, p, catalogue, snapshots)
-            validate_run(stage / condition)
             print(
                 json.dumps({k: v for k, v in reports[condition].items() if k != "artifacts"}),
                 flush=True,
             )
             del scheduler, neural, body, controller, sim
             gc.collect()
-        comparison = (
-            compare_conditions(stage) if len(conditions) == 3 else {"conditions": list(conditions)}
-        )
-        write_json(stage / "comparison.json", comparison)
+    for condition in conditions:
+        validate_run(output / condition)
+    comparison = (
+        compare_conditions(output)
+        if set(conditions) == {"feedback_off", "sensory_clamp", "motor_clamp", "feedback_on"}
+        or set(conditions) == {"feedback_off", "sensory_clamp", "feedback_on"}
+        else {"conditions": list(conditions)}
+    )
+    write_json(output / "comparison.json", comparison)
     return comparison
 
 
@@ -236,18 +266,19 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, default=Path("configs/closed_loop/lf_tibia_v1.yaml"))
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--seed", type=int, help="Override the seed in the saved run config")
     parser.add_argument(
         "--condition",
-        choices=("all", "feedback_on", "feedback_off", "sensory_clamp"),
+        choices=("all", "feedback_on", "feedback_off", "sensory_clamp", "motor_clamp"),
         default="all",
     )
     args = parser.parse_args()
     config = yaml.safe_load(args.config.read_text(encoding="utf-8"))
-    conditions = (
-        ("feedback_off", "sensory_clamp", "feedback_on")
-        if args.condition == "all"
-        else (args.condition,)
-    )
+    if args.seed is not None:
+        if args.seed < 0:
+            raise ValueError("Seed must be nonnegative")
+        config["seed"] = args.seed
+    conditions = None if args.condition == "all" else (args.condition,)
     result = run_experiment(config, args.output, conditions=conditions)
     print(json.dumps(result, indent=2))
 

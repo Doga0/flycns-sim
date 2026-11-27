@@ -1,0 +1,38 @@
+# Engineering physical-feedback probe; v1 anatomical and neural profiles are unchanged.
+version: closed-loop-lf-tibia-load-v2
+duration_ms: 1000.0
+seed: 42
+encoder_mode: poisson
+monitor: control_and_sensory
+frames: 0
+clocks:
+  neural_dt_ms: 0.1
+  physics_dt_ms: 0.1
+  sensory_dt_ms: 1.0
+  motor_dt_ms: 10.0
+graph: data/processed/malecns-v1.0/published-v1
+catalogue: data/processed/malecns-v1.0/published-v1/io-v1
+motor_mapping: data/processed/malecns-v1.0/published-v1/bridge-v1
+sensory_mapping: data/processed/malecns-v1.0/published-v1/sensory-bridge-v1
+lif_config: configs/neural/shiu_lif_v1.yaml
+expected_lif_config_sha256: 4b01b9d7b8ada0e8125d7c2b21d58391a91f39a0a277a5ec192ad5776ff9b859
+initial_condition:
+  joint: fly/lf_trochanterfemur-lf_tibia-pitch
+  offset_rad: 0.0
+# Time-only applied joint torque, not a biological muscle model.
+perturbation:
+  type: ramp_hold_release
+  joint: fly/lf_trochanterfemur-lf_tibia-pitch
+  amplitude_nm: 20.0
+  start_ms: 100.0
+  ramp_duration_ms: 100.0
+  hold_duration_ms: 500.0
+  release_duration_ms: 100.0
+# Engineering guards, not physiological limits.
+safety:
+  max_duration_ms: 1200.0
+  max_abs_joint_offset_rad: 0.40
+  max_abs_velocity_rad_s: 100.0
+  max_sensory_rate_hz: 100.0
+  max_motor_rate_hz: 500.0
+  max_total_spikes_per_ms: 10000

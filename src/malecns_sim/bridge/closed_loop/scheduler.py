@@ -23,9 +23,14 @@ class SafetyLimit(RuntimeError):
 class MuJoCoBody:
     """The scheduler sees a body boundary, not MuJoCo address arithmetic."""
 
-    def __init__(self, sim, reader, controller, clocks, safety, neutral):
+    def __init__(self, sim, reader, controller, clocks, safety, neutral, perturbation=None):
         self.sim, self.reader, self.controller = sim, reader, controller
         self.clocks, self.safety, self.neutral = clocks, safety, neutral
+        self.perturbation = perturbation
+        self.torque_dof = None if perturbation is None else perturbation.dof(sim.model)
+
+    def external_torque_at(self, t_ms):
+        return 0.0 if self.perturbation is None else self.perturbation.torque_at(t_ms)
 
     @property
     def time_ms(self):
@@ -41,9 +46,13 @@ class MuJoCoBody:
 
     def advance(self, duration_ms):
         for _ in range(steps(duration_ms, self.clocks.physics_dt_ms)):
+            if self.torque_dof is not None:
+                self.sim.data.qfrc_applied[self.torque_dof] = self.external_torque_at(self.time_ms)
             mujoco.mj_step(self.sim.model, self.sim.data)
             check_state(self.sim)
             self.read()
+        if self.torque_dof is not None:
+            self.sim.data.qfrc_applied[self.torque_dof] = 0.0
 
     def apply(self, command):
         self.controller.apply(command, self.sim.data)
@@ -52,7 +61,7 @@ class MuJoCoBody:
 class ClosedLoopScheduler:
     """Injectable interfaces keep orchestration independent of neural/encoder internals.
 
-    modes: feedback_on, feedback_off, sensory_clamp; compatibility probes:
+    modes: feedback_on, feedback_off, sensory_clamp, motor_clamp; compatibility probes:
     motor_only accepts recorded motor events, sensory_only accepts a driven body.
     """
 
@@ -75,6 +84,7 @@ class ClosedLoopScheduler:
             "feedback_on",
             "feedback_off",
             "sensory_clamp",
+            "motor_clamp",
             "motor_only",
             "sensory_only",
         }:
@@ -166,7 +176,12 @@ class ClosedLoopScheduler:
                     )
                     accumulator = []
                     for command in commands:
-                        applied = self.mode not in {"feedback_off", "sensory_clamp", "sensory_only"}
+                        applied = self.mode not in {
+                            "feedback_off",
+                            "sensory_clamp",
+                            "motor_clamp",
+                            "sensory_only",
+                        }
                         if applied:
                             self.body.apply(command)
                         self.motor_commands.append(
@@ -188,6 +203,7 @@ class ClosedLoopScheduler:
                         "q": state.joint_position_rad,
                         "qvel": state.joint_velocity_rad_s,
                         "target": state.actuator_target_rad,
+                        "external_torque_nm": self.body.external_torque_at(start),
                         "sensory_rate_hz": sum(r["rate_hz"] for r in activity),
                         "sensory_events": len(events),
                         "injected_events": sum(r["injected"] for r in events),

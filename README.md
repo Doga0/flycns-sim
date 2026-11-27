@@ -1,6 +1,19 @@
-# malecns-sim v0.7 development — Closed-loop orchestration
+# malecns-sim — v0.8.1 physical feedback validation
 
-The stateful LF tibia scheduler now combines the existing sensory and motor
+The current experiment adds a sustained, time-only external LF tibia torque and a
+`motor_clamp` control to the existing causal scheduler. It keeps the published graph,
+LIF, sensory encoder/mapping and motor decoder/mapping unchanged. This is an
+engineering physical-feedback test, not a locomotion or biological-reflex claim.
+The first seed-42 four-condition run passed the engineering gate with a 0.04249 rad
+peak physical difference; all five declared seeds passed the four-condition
+engineering gate (peak effects 0.03462–0.04830 rad). Docker reproduced seed-42
+discrete event and command traces exactly.
+See [the v0.8.1 protocol](docs/closed-loop.md#v081-external-load-physical-feedback-probe)
+for calibration, four-condition commands, acceptance metrics and the measured status.
+
+## Historical v0.7 result
+
+The stateful LF tibia scheduler combines the existing sensory and motor
 bridges. **The requested real-data embodiment acceptance has not passed:** the
 200 ms, +0.20 rad, seed-42 perturb-and-release experiment produced 8 sensory
 input events and 9 CNS spikes, but zero spikes in the seven mapped LF tibia
@@ -34,8 +47,8 @@ v0.6 independently validates the opposite direction to v0.5: a controlled
 MuJoCo left-front tibia trajectory is sampled, encoded as input for explicitly
 annotated MaleCNS sensory cells, and replayed through the full-CNS LIF model.
 The resulting neural activity is recorded, including original MaleCNS body IDs.
-No neural motor output is applied to the body during this experiment. The two
-directions remain separate until the planned v0.7 closed-loop scheduler.
+No neural motor output is applied to the body during this independent v0.6 replay.
+The later v0.7 scheduler combines both directions.
 
 ## Run the sensory bridge
 

@@ -34,9 +34,10 @@ Read this file fully before changing anything.
   a result, choose a "lucky" seed, inject artificial motor spikes into real-data runs, or
   relabel other motor cells to make an acceptance gate pass. New mappings use explicit,
   reviewed body IDs in a versioned YAML profile. See DECISIONS.md D5–D8.
-- **Current phase is v0.7.x (diagnostic).** The owner closed v0.7 at `0.7.0.dev0`; do not
-  tag `0.7.0`, do not debug v0.7 to force motor spikes, and do not add simulator features
-  until the pathway investigation reports (DECISIONS.md D17, ROADMAP §2).
+- **Current phase is v0.8.1 (physical validation).** The owner closed v0.7 at
+  `0.7.0.dev0` and completed the pathway investigation. Do not tag `0.7.0` or change
+  v1 graph, LIF, sensory/motor mapping, encoder or decoder to force physical feedback.
+  See DECISIONS.md D19 and ROADMAP §3.
 - **Label assumptions.** Engineering conventions (decoder gains, encoder transfer functions,
   actuator bounds, safety guards) are labeled as such in configs and reports. Do not
   describe them as biological facts.

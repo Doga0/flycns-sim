@@ -174,3 +174,19 @@ New decisions: append an entry with date, evidence, rationale, trade-offs.
   (hops × 1.8 ms); measured latency belongs to the activation sweep.
 - **Trade-off:** walk counts overstate simple-path counts where cycles exist; the enumerated
   table flags non-simple paths so the difference is visible for short paths.
+
+### D19. v0.8.1 tests physical feedback under unchanged v1 interfaces (2026-11-26)
+- **Decided by:** the owner in the project chat; implementation in
+  `bridge/closed_loop/perturbation.py`, `scheduler.py`, and `validate.py`.
+- **Decision:** add a time-only external torque at a named hinge, with step and
+  ramp-hold-release profiles. All conditions receive the same load. `motor_clamp` injects
+  sensory input and decodes motor output but does not apply commands. v1 graph, LIF,
+  sensory/motor mappings, encoder and decoder remain unchanged.
+- **Evidence:** the v0.7.x subset sweep shows heterogeneous sensory effects, while the
+  sustained 100 Hz full-CNS sweep can activate two mapped flexors. The v0.7 initial
+  displacement decayed before sustained sensory drive developed.
+- **Engineering scope:** torque magnitude, time course, safety limits and the 0.01 rad
+  provisional functional target are experiment parameters, not biological constants.
+  An engineering pass requires sensory and mapped motor spikes, a nonneutral applied
+  command, a causal trajectory effect above numeric tolerance, and seed replication.
+  Failed effects are reported; v1 scientific parameters and seeds are not tuned to force a pass.
