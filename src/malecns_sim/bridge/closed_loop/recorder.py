@@ -92,6 +92,7 @@ def save_run(directory, scheduler, provenance, catalogue, snapshots=()):
                 "q": 0.0,
                 "qvel": 0.0,
                 "target": 0.0,
+                "external_torque_nm": 0.0,
                 "sensory_rate_hz": 0.0,
                 "sensory_events": 0,
                 "injected_events": 0,
@@ -128,6 +129,22 @@ def save_run(directory, scheduler, provenance, catalogue, snapshots=()):
     commands = scheduler.motor_commands
     body = scheduler.body_states
     neutral = scheduler.body.neutral
+    perturbation = scheduler.body.perturbation
+    if perturbation is None:
+        hold_events = []
+        mean_hold_rate_hz = None
+        actual_hold_input_rate_hz = None
+    else:
+        hold_start = perturbation.start_ms + perturbation.ramp_duration_ms
+        hold_stop = hold_start + perturbation.hold_duration_ms
+        hold_events = [r for r in scheduler.sensory_events if hold_start <= r["t_ms"] < hold_stop]
+        hold_rates = [r["rate_hz"] for r in activity if hold_start <= r["t_start_ms"] < hold_stop]
+        mean_hold_rate_hz = float(np.mean(hold_rates)) if hold_rates else None
+        actual_hold_input_rate_hz = (
+            len(hold_events) * 1000 / (len(inputs) * perturbation.hold_duration_ms)
+            if inputs and hold_rates
+            else None
+        )
     report = {
         "status": scheduler.status,
         "reason": scheduler.reason,
@@ -136,6 +153,9 @@ def save_run(directory, scheduler, provenance, catalogue, snapshots=()):
         "requested_duration_ms": provenance["config"]["duration_ms"],
         "sensory_events": sum(r["injected"] for r in scheduler.sensory_events),
         "generated_sensory_events": len(scheduler.sensory_events),
+        "generated_hold_sensory_events": len(hold_events),
+        "mean_hold_nominal_sensory_rate_hz": mean_hold_rate_hz,
+        "actual_hold_input_rate_hz_per_cell": actual_hold_input_rate_hz,
         "active_sensory_neurons": len(
             {r["node_index"] for r in scheduler.neural_spikes if r["node_index"] in inputs}
         ),
@@ -146,6 +166,12 @@ def save_run(directory, scheduler, provenance, catalogue, snapshots=()):
         "motor_commands": len(commands),
         "nonneutral_motor_commands": sum(
             abs(r["target"] - neutral) > 1e-12 for r in commands if r["applied"]
+        ),
+        "decoded_nonneutral_motor_commands": sum(
+            abs(r["target"] - neutral) > 1e-12 for r in commands
+        ),
+        "peak_decoded_target_offset_rad": max(
+            (abs(r["target"] - neutral) for r in commands), default=0.0
         ),
         "max_joint_offset_rad": max(
             (abs(r["joint_position_rad"] - neutral) for r in body), default=0

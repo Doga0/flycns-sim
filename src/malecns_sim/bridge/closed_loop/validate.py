@@ -77,9 +77,9 @@ def validate_run(directory):
         return report
     if report["status"] != "COMPLETED" or report["mujoco_warnings"] or report["nonfinite_states"]:
         raise ValueError("Invalid completed run state")
-    for table in tables.values():
+    for name, table in tables.items():
         if not np.isfinite(table.select_dtypes(include="number").to_numpy()).all():
-            raise ValueError("Nonfinite completed timeline")
+            raise ValueError(f"Nonfinite completed table: {name}")
     timeline, commands = tables["timeline"], tables["motor_commands"]
     dt, motor_dt = config["clocks"]["sensory_dt_ms"], config["clocks"]["motor_dt_ms"]
     expected = np.arange(round(config["duration_ms"] / dt)) * dt
@@ -139,12 +139,32 @@ def validate_run(directory):
         report["total_cns_spikes"] or report["sensory_events"] or commands.applied.any()
     ):
         raise ValueError("Control condition generated/applied neural feedback")
+    if provenance["condition"] == "motor_clamp" and commands.applied.any():
+        raise ValueError("Motor-clamped command was applied")
+    if "external_torque_nm" in timeline:
+        from malecns_sim.bridge.closed_loop.perturbation import JointTorque
+
+        # The profile is already resolved in provenance; no MuJoCo model is needed here.
+        perturbation = None
+        policy = provenance.get("external_perturbation")
+        if policy is not None:
+            perturbation = JointTorque(**policy)
+        expected_torque = [
+            0.0 if perturbation is None else perturbation.torque_at(t) for t in timeline.t_ms
+        ]
+        if not np.allclose(timeline.external_torque_nm, expected_torque, rtol=0, atol=1e-12):
+            raise ValueError("External torque does not match the time-only profile")
     return report
 
 
 def compare_conditions(directory):
     directory = Path(directory)
-    conditions = ("feedback_off", "sensory_clamp", "feedback_on")
+    has_motor_clamp = (directory / "motor_clamp").exists()
+    conditions = (
+        ("feedback_off", "sensory_clamp", "motor_clamp", "feedback_on")
+        if has_motor_clamp
+        else ("feedback_off", "sensory_clamp", "feedback_on")
+    )
     reports = {c: validate_run(directory / c) for c in conditions}
     provenance = {c: read_json(directory / c / "provenance.json") for c in conditions}
     for key in (
@@ -171,16 +191,111 @@ def compare_conditions(directory):
     clamp_error = float(np.max(np.abs(states["feedback_off"] - states["sensory_clamp"])))
     effect = float(np.max(np.abs(states["feedback_on"] - states["feedback_off"])))
     on = reports["feedback_on"]
+    if has_motor_clamp:
+        motor_clamp_error = float(np.max(np.abs(states["feedback_off"] - states["motor_clamp"])))
+        torque = {
+            c: pq.read_table(directory / c / "timeline.parquet")
+            .to_pandas()
+            .external_torque_nm.to_numpy()
+            for c in conditions
+        }
+        if any(not np.array_equal(torque[c], torque["feedback_off"]) for c in conditions):
+            raise ValueError("External load differs between conditions")
+        clamp = reports["motor_clamp"]
+        sensory_on = pq.read_table(
+            directory / "feedback_on" / "sensory_activity.parquet"
+        ).to_pandas()
+        sensory_clamped = pq.read_table(
+            directory / "motor_clamp" / "sensory_activity.parquet"
+        ).to_pandas()
+        if len(sensory_on) != len(sensory_clamped):
+            raise ValueError("Sensory activity ticks differ between motor conditions")
+        sensory_delta = np.abs(sensory_on.rate_hz.to_numpy() - sensory_clamped.rate_hz.to_numpy())
+        max_sensory_effect = float(np.max(sensory_delta))
+        changed_sensory = np.flatnonzero(sensory_delta > 1e-6)
+        first_sensory_change = (
+            None
+            if not len(changed_sensory)
+            else float(sensory_on.t_start_ms.iloc[changed_sensory[0]])
+        )
+        metrics = {
+            "motor_clamp_vs_baseline_rad": motor_clamp_error,
+            "motor_clamp_mapped_motor_spikes": clamp["mapped_motor_spikes"],
+            "motor_clamp_decoded_nonneutral_commands": clamp["decoded_nonneutral_motor_commands"],
+            "functional_target_0p01_rad_met": effect >= 0.01,
+            "max_sensory_rate_change_vs_motor_clamp_hz": max_sensory_effect,
+            "first_feedback_sensory_rate_change_ms": first_sensory_change,
+        }
+    else:
+        motor_clamp_error, max_sensory_effect, first_sensory_change, metrics = 0.0, 0.0, None, {}
+    commands = pq.read_table(directory / "feedback_on" / "motor_commands.parquet").to_pandas()
+    motors = pq.read_table(directory / "feedback_on" / "motor_activity.parquet").to_pandas()
+    sensory_events = pq.read_table(directory / "feedback_on" / "sensory_events.parquet").to_pandas()
+    neutral = provenance["feedback_on"]["motor_mapping"]["resolved_channels"][0]["body"][
+        "neutral_position"
+    ]
+    driven = commands[commands.applied & (np.abs(commands.target - neutral) > 1e-12)]
+    first_motor = None if motors.empty else float(motors.t_ms.min())
+    first_command = None if driven.empty else float(driven.t_ms.min())
+    dt_ms = provenance["feedback_on"]["config"]["clocks"]["sensory_dt_ms"]
+    effect_tolerance_rad = 1e-6 if has_motor_clamp else 1e-10
+    changed = np.flatnonzero(
+        np.abs(states["feedback_on"] - states["feedback_off"]) > effect_tolerance_rad
+    )
+    first_physical = None if len(changed) == 0 else float(changed[0] * dt_ms)
+    first_sensory = None if sensory_events.empty else float(sensory_events.t_ms.min())
+    causal = (
+        first_sensory is not None
+        and first_motor is not None
+        and first_command is not None
+        and first_physical is not None
+        and first_sensory <= first_motor < first_command <= first_physical
+    )
+    feedback_causal = not has_motor_clamp or (
+        first_sensory_change is not None
+        and first_physical is not None
+        and first_sensory_change >= first_physical
+    )
     passed = (
-        effect > 1e-10
+        effect > effect_tolerance_rad
         and clamp_error <= 1e-12
+        and motor_clamp_error <= 1e-12
+        and on["sensory_events"] > 0
         and on["mapped_motor_spikes"] > 0
         and on["nonneutral_motor_commands"] > 0
+        and causal
+        and feedback_causal
+        and (not has_motor_clamp or max_sensory_effect > 1e-6)
     )
+    diff = states["feedback_on"] - states["feedback_off"]
+    dt_s = dt_ms / 1000
+    load = provenance["feedback_on"].get("external_perturbation")
+    recovery_ms = None
+    if load is not None and effect > 0:
+        release_end = sum(
+            load[k]
+            for k in ("start_ms", "ramp_duration_ms", "hold_duration_ms", "release_duration_ms")
+        )
+        after_release = np.arange(len(diff)) * dt_ms >= release_end
+        recovered = np.flatnonzero(after_release & (np.abs(diff) <= 0.1 * effect))
+        if len(recovered):
+            recovery_ms = float(recovered[0] * dt_ms - release_end)
     return {
         "acceptance_passed": bool(passed),
         "max_effect_vs_open_loop_rad": effect,
+        "engineering_effect_tolerance_rad": effect_tolerance_rad,
+        "rms_effect_vs_open_loop_rad": float(np.sqrt(np.mean(diff**2))),
+        "integrated_abs_effect_rad_s": float(np.sum(np.abs(diff[:-1])) * dt_s),
+        "recovery_to_10pct_peak_after_load_ms": recovery_ms,
+        "first_sensory_event_ms": first_sensory,
+        "first_mapped_motor_spike_ms": first_motor,
+        "first_nonneutral_command_ms": first_command,
+        "first_physical_response_ms": first_physical,
+        "causal_order_passed": bool(causal),
+        "feedback_sensory_causality_passed": bool(feedback_causal),
+        "peak_decoded_target_offset_rad": on.get("peak_decoded_target_offset_rad"),
         "sensory_clamp_vs_baseline_rad": clamp_error,
+        **metrics,
         "feedback_on_mapped_motor_spikes": on["mapped_motor_spikes"],
         "reason": "Causal physical feedback observed"
         if passed
@@ -193,7 +308,14 @@ def compare_conditions(directory):
 
 def compare_reproductions(left, right):
     """Require equal discrete traces and tightly matching physical state across hosts."""
-    for condition in ("feedback_off", "sensory_clamp", "feedback_on"):
+    if (Path(left) / "motor_clamp").exists() != (Path(right) / "motor_clamp").exists():
+        raise ValueError("Reproductions have different condition sets")
+    conditions = (
+        ("feedback_off", "sensory_clamp", "motor_clamp", "feedback_on")
+        if (Path(left) / "motor_clamp").exists() and (Path(right) / "motor_clamp").exists()
+        else ("feedback_off", "sensory_clamp", "feedback_on")
+    )
+    for condition in conditions:
         a, b = Path(left) / condition, Path(right) / condition
         ra, rb = validate_run(a), validate_run(b)
         for key in (

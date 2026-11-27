@@ -6,6 +6,8 @@ import pyarrow as pa
 import pytest
 
 from malecns_sim.bridge.closed_loop.clocks import Clocks
+from malecns_sim.bridge.closed_loop.load_sweep import sweep
+from malecns_sim.bridge.closed_loop.perturbation import JointTorque
 from malecns_sim.bridge.closed_loop.recorder import save_run
 from malecns_sim.bridge.closed_loop.scheduler import SPIKE_SCHEMA, ClosedLoopScheduler, MuJoCoBody
 from malecns_sim.bridge.controller import BodyController
@@ -24,7 +26,7 @@ from malecns_sim.simulation.fly import build_fly
 
 @pytest.fixture
 def make_scheduler():
-    def make(mode="feedback_on", recorded=(), safety=None):
+    def make(mode="feedback_on", recorded=(), safety=None, perturbation=None):
         sim = build_fly()
         policy = load_policy()
         channel = policy["channels"][0]
@@ -92,7 +94,10 @@ def make_scheduler():
             "max_total_spikes_per_ms": 10000,
         }
         limits.update(safety or {})
-        body = MuJoCoBody(sim, reader, BodyController(motor, sim.model), clocks, limits, neutral)
+        torque = JointTorque.from_config(perturbation, sim.model)
+        body = MuJoCoBody(
+            sim, reader, BodyController(motor, sim.model), clocks, limits, neutral, torque
+        )
         return ClosedLoopScheduler(
             body=body,
             neural=neural,
@@ -165,6 +170,83 @@ def test_synthetic_feedback_changes_physics_clamp_removes_effect_and_seed_repeat
         )
         > 1e-6
     )
+
+
+def test_motor_clamp_decodes_without_actuating(make_scheduler):
+    on = make_scheduler("feedback_on").run(50)
+    clamped = make_scheduler("motor_clamp").run(50)
+    off = make_scheduler("feedback_off").run(50)
+    assert clamped.status == "COMPLETED"
+    assert [r for r in clamped.sensory_events if r["t_ms"] < 10] == [
+        r for r in on.sensory_events if r["t_ms"] < 10
+    ]
+    assert clamped.motor_activity[:1] == on.motor_activity[:1]
+    assert any(abs(r["target"] - clamped.body.neutral) > 1e-12 for r in clamped.motor_commands)
+    assert not any(r["applied"] for r in clamped.motor_commands)
+    assert clamped.body_states == off.body_states
+
+
+def test_external_torque_is_time_only_and_equal_across_conditions(make_scheduler):
+    profile = {
+        "type": "ramp_hold_release",
+        "joint": "fly/lf_trochanterfemur-lf_tibia-pitch",
+        "amplitude_nm": 2.0,
+        "start_ms": 10.0,
+        "ramp_duration_ms": 10.0,
+        "hold_duration_ms": 20.0,
+        "release_duration_ms": 10.0,
+    }
+    on = make_scheduler("feedback_on", perturbation=profile).run(50)
+    off = make_scheduler("feedback_off", perturbation=profile).run(50)
+    assert [r["external_torque_nm"] for r in on.timeline] == [
+        r["external_torque_nm"] for r in off.timeline
+    ]
+    assert on.timeline[0]["external_torque_nm"] == 0
+    assert on.timeline[10]["external_torque_nm"] == 0
+    assert on.timeline[20]["external_torque_nm"] == 2
+    assert on.timeline[40]["external_torque_nm"] == 2
+    assert all(
+        not np.any(r) for r in (on.body.sim.data.qfrc_applied, off.body.sim.data.qfrc_applied)
+    )
+
+
+def test_step_torque_half_open_and_profile_validation():
+    sim = build_fly()
+    profile = {
+        "type": "step_torque",
+        "joint": "fly/lf_trochanterfemur-lf_tibia-pitch",
+        "amplitude_nm": -3.0,
+        "start_ms": 5.0,
+        "hold_duration_ms": 10.0,
+    }
+    torque = JointTorque.from_config(profile, sim.model)
+    assert [torque.torque_at(t) for t in (0, 5, 10, 14.9, 15)] == [0, -3, -3, -3, 0]
+    with pytest.raises(ValueError, match="named hinge"):
+        JointTorque.from_config({**profile, "joint": "unknown"}, sim.model)
+    with pytest.raises(ValueError, match="positive hold"):
+        JointTorque.from_config({**profile, "hold_duration_ms": 0}, sim.model)
+
+
+def test_physics_only_sweep_writes_trace_and_refuses_overwrite(tmp_path):
+    config = {
+        "duration_ms": 10.0,
+        "initial_condition": {"joint": "fly/lf_trochanterfemur-lf_tibia-pitch"},
+        "perturbation": {
+            "type": "step_torque",
+            "joint": "fly/lf_trochanterfemur-lf_tibia-pitch",
+            "amplitude_nm": 1.0,
+            "start_ms": 1.0,
+            "hold_duration_ms": 5.0,
+        },
+        "safety": {"max_abs_joint_offset_rad": 0.4},
+    }
+    output = tmp_path / "sweep"
+    result = sweep(config, [1.0], output)
+    assert result[0]["amplitude_nm"] == 1.0
+    assert (output / "trajectory_00.parquet").exists()
+    assert (output / "report.json").exists()
+    with pytest.raises(FileExistsError):
+        sweep(config, [1.0], output)
 
 
 @pytest.mark.parametrize(

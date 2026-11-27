@@ -1,23 +1,77 @@
 # Project state
 
-Last verified: **2026-10-11**, by reconstructing state from the repository (no handoff from
-the previous agent existed). Verify against `git status` and the code before relying on it.
+Last verified: **2026-11-27**, for the v0.8.1 physical validation work. Earlier
+v0.7.x evidence below is retained as historical context; verify git and artifacts before
+relying on it.
 
 Legend: **[verified]** checked during this audit; **[recorded]** stated in repo docs or
 saved artifacts but not re-run; **[inferred]** reasoned from evidence; **[unknown]**.
 
-## Current stage
+## Current stage: v0.8.1 physical feedback validation complete
 
-v0.7 (closed loop) is committed on `main` (HEAD `4a49f3c`); **its scientific acceptance
-gate fails.** The package version in the
+The owner set the v0.8.1 scope on 2026-11-26: retain all v1 graph, LIF and bridge
+profiles; add a time-only step/ramp external joint torque, a fourth `motor_clamp`
+condition, physics calibration, four-condition full-CNS validation and seed 42–46
+replication. v0.8.2 is sensory subtype characterization, with no new tuning until
+anatomy and literature support it. See [ROADMAP.md](ROADMAP.md) and
+[closed-loop.md](closed-loop.md#v081-external-load-physical-feedback-probe).
+
+The previously uncommitted v0.7.x analysis package, tests and AGENTS update were
+committed in `f0ed454`; its reports were committed in `56be07e`. The current v0.8.1
+changes are on `codex/v0.8.1-physical-feedback` for review. No v1 profile or prior
+output was overwritten; the measured output directories remain git-ignored.
+
+**Verified v0.8.1 work so far:** named-joint step and ramp-hold-release external
+torque; `motor_clamp` decodes without applying; load traces and hashes; seed override;
+four-condition validator and physical effect metrics. Physics-only load sweep
+(`outputs/closed_loop/load_sweep_trace_2026-11-27`) gave mean hold offsets 0.1547,
+0.2385, 0.3236 rad at 10, 15, 20 N·m, with no warnings. 25 N·m was rejected by
+the 0.40 rad engineering guard. The v2 profile uses 20 N·m, an engineering load,
+not a physiological force. A diagnostic `motor_clamp` seed-42 run produced 1,228
+sensory events, 5 mapped motor spikes (body IDs 807165 and 809912) and 68 decoded
+nonneutral commands. Its first artifact failed schema validation because
+`external_torque_nm` was placed in the motor command schema; that invalid diagnostic run remains
+under `outputs/closed_loop/lf_tibia_load_v2_motor_clamp_seed42_recheck_2026-11-26/`
+for diagnosis. This is not a validated acceptance artifact. The corrected four-condition
+seed-42 run is under `outputs/closed_loop/lf_tibia_load_v2_seed42_2026-11-26/`.
+`closed_loop.validate --require-effect` **passes**: maximum physical trajectory
+difference 0.04249 rad (RMS 0.00821), first sensory event 118 ms, first mapped
+motor spike 325.7 ms, first applied nonneutral command 330 ms, first body effect
+331 ms. Both clamps exactly match baseline physics. Subsequent sensory rate
+differs by up to 12.14 Hz. This is one-seed engineering validation, not a
+biological reflex claim. All declared seeds 42–46 passed the four-condition
+engineering gate (`outputs/closed_loop/lf_tibia_load_v2_seed_report_2026-11-27/`),
+with peak physical effects 0.03462–0.04830 rad. The provisional 0.01 rad target
+was met in each seed. The Docker seed-42 four-condition run is complete and
+`closed_loop.validate <Windows seed42> --compare <Docker seed42>` returned
+`reproduction_passed: true` (exact discrete events/commands, `1e-9` body tolerance).
+
+**Checks (2026-11-27):** Windows `.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider -o log_cli=false`:
+**139 passed, 0 failed, 0 skipped,
+20 third-party warnings** in 268.87 s. Docker focused closed-loop suite:
+14 passed, 18 warnings. Docker `docker compose run --rm sim pytest -q -p no:cacheprovider`:
+**139 passed, 0 failed, 0 skipped, 20 third-party
+warnings** in 241.65 s. Focused Ruff check and
+format check pass. Repository-wide Ruff still has the pre-existing I001 in
+`cns/graph/query.py`; repository-wide format check reports four unrelated
+pre-existing files after formatting the new seed-report test. The old v0.7
+`lf_tibia_seed42` artifact validates with `acceptance_passed: false` under the
+new validator. Next: v0.8.2 sensory interface characterization, beginning with
+the 23 mapped cells' annotation and literature evidence; no tuning or new
+biological subtype mapping is claimed by v0.8.1.
+
+## Historical v0.7 state
+
+At the 2026-10-11 snapshot, v0.7 (closed loop) was committed on `main` after
+`4a49f3c`; **its scientific acceptance gate failed.** The package version in the
 working tree is `0.7.0.dev0`.
 
 **Owner decision (Berke, 2026-10-11):** v0.7 is closed as a *successful infrastructure
 release with a failed biological/functional acceptance*. It stays `0.7.0.dev0` and must
 **not** be tagged `0.7.0`. Do not keep debugging v0.7 to force motor spikes, and do not add
-new simulator features in v0.7.x. The current phase is **v0.7.x pathway investigation**
-(ROADMAP §2): pathway audit, then a MuJoCo-free sensory rate sweep, then a latency and
-connectivity report. That result decides what v0.8 contains (DECISIONS.md D17).
+new simulator features in v0.7.x. The then-current phase was **v0.7.x pathway
+investigation** (ROADMAP §2): pathway audit, a MuJoCo-free sensory rate sweep,
+and a latency/connectivity report. It informed the later v0.8 scope (DECISIONS.md D17).
 
 v0.7 boundary as stated by the owner: done are the persistent LIF, incremental spikes,
 causal scheduler, body→CNS, the CNS→body mechanism, clock sync, safety guards, provenance,
@@ -39,7 +93,7 @@ MaleCNS experiment. Not done: real MaleCNS physical feedback.
 | Closed-loop scheduler, runner, recorder, validator (v0.7) | software done | `tests/bridge/test_closed_loop.py` pass, including a synthetic 3-neuron graph where feedback changes the trajectory [verified] |
 | Windows ↔ Docker reproduction of the v0.7 run | passes on saved artifacts | `closed_loop.validate outputs/closed_loop/lf_tibia_seed42 --compare outputs/closed_loop/lf_tibia_docker_seed42` → `reproduction_passed: true` [verified, 2026-10-11] |
 
-## In progress / incomplete
+## Historical v0.7 acceptance failure
 
 **v0.7 real-data physical-feedback acceptance: FAILING.**
 The run (full MaleCNS, LF tibia +0.20 rad perturb-and-release, 200 ms, seed 42) gives
@@ -105,7 +159,7 @@ Result [verified, 2026-10-11, 8 min 16 s wall time on Windows]: all three condit
 `reproduction_passed: true` (exact events/commands, 1e-9 body tolerance). So the current
 working-tree code reproduces the recorded 2026-09-22 result.
 
-## Git state (2026-10-12)
+## Historical Git state (2026-10-12 snapshot; superseded by current stage above)
 
 - Branch `main`, in sync with `origin/main` (`https://github.com/Doga0/flycns-sim`).
   HEAD `4a49f3c` "project docs for agents".
@@ -126,7 +180,7 @@ working-tree code reproduces the recorded 2026-09-22 result.
   `ruff check` / `ruff format --check` clean on `src/malecns_sim/analysis` and
   `tests/analysis`. Full suite not re-run.
 
-## Current task: v0.7.x pathway investigation (owner plan, 2026-10-11)
+## Historical task: v0.7.x pathway investigation (completed)
 
 The owner set this sequence. It is diagnostic work: report what the current graph and LIF
 policy do, do not add biological assumptions, do not change v1 profiles, and do not read the
@@ -182,7 +236,7 @@ output `outputs/analysis/lf_tibia_pathway_report/`, written up in
 the two active flexors get more excitation via 1-hop interneurons than directly from the
 sensory cells.
 
-**Next: the owner decides the v0.8 scope (ROADMAP 2.4).** The evidence supports
+**The owner decided the v0.8 scope on 2026-11-26 (ROADMAP §3).** The evidence supports
 "physical sensory-motor validation" (the pathway works without weight or sign changes)
 but raises three interface questions: how to reach about 87 Hz per sensory cell, whether a
 flexor-only response is acceptable, and how the decoder should normalize when 2 of 5
@@ -207,9 +261,8 @@ to the v0.8 decision: the one-population encoder mixes opposing sensory channels
 ## Unknowns that need human input
 
 1. (Resolved 2026-10-11: the owner committed v0.7 to `main`.)
-2. v0.8 scope: physical sensory-motor validation or interface/model calibration? The
-   investigation has reported (lf-tibia-pathway-report.md); this is now the open decision,
-   including whether flexor-only activation is an acceptable first criterion.
+2. (Resolved 2026-11-26: physical validation first, sensory characterization second;
+   flexor-only activity can satisfy the engineering gate.)
 3. Has the Windows MuJoCo viewer been verified manually? README says no, but
    `outputs/bridge/lf_viewer_live` and `six_leg_viewer_live` exist.
 4. Were the 2026-09-22 Docker outputs produced from the final code?

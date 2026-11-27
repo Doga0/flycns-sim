@@ -116,7 +116,7 @@ Sensory direction (body → CNS), `bridge/sensory/`:
 | `sensory/replay.py` | Offline: drive the body through a keyframed trajectory, encode, run full-CNS LIF |
 | `sensory/validate.py` | Mapping/run validation, Windows/Docker comparison |
 
-### `bridge/closed_loop/`: causal orchestration (v0.7)
+### `bridge/closed_loop/`: causal orchestration and physical probe (v0.7–v0.8.1)
 
 | File | Responsibility |
 | --- | --- |
@@ -125,11 +125,17 @@ Sensory direction (body → CNS), `bridge/sensory/`:
 | `closed_loop/runner.py` | `prepare()` (config, LIF hash, catalogue, both mappings, clock consistency, body fingerprint) and `run_experiment()` over conditions |
 | `closed_loop/recorder.py` | `save_run()`: parquet tables, provenance, report, optional frames, partial artifacts on abort |
 | `closed_loop/validate.py` | `validate_run`, `compare_conditions` (acceptance), `compare_reproductions` (Windows vs Docker) |
+| `closed_loop/perturbation.py` | `JointTorque`: named hinge, time-only step or ramp-hold-release torque, applied through MuJoCo `qfrc_applied` each physics step |
+| `closed_loop/load_sweep.py` | Physics-only amplitude calibration; records actual joint displacement and nominal v1 encoder rate |
+| `closed_loop/seed_report.py` | Aggregate declared seed runs read-only; require matching profiles and refuse missing/repeated seeds |
 
 Config: `configs/closed_loop/lf_tibia_v1.yaml` (200 ms, seed 42, Poisson encoder,
 `control_and_sensory` monitor, +0.20 rad initial tibia offset, safety limits).
+The separate `lf_tibia_load_v2.yaml` retains the v1 graph, LIF, encoder and decoder
+profiles but adds a 1000 ms external load experiment. `motor_clamp` encodes and injects
+sensory events and decodes motor spikes while withholding actuator application.
 
-### `analysis/`: read-only diagnostics (v0.7.x, uncommitted)
+### `analysis/`: read-only diagnostics (v0.7.x, committed)
 
 | File | Responsibility |
 | --- | --- |
@@ -147,11 +153,13 @@ From `scheduler.py:ClosedLoopScheduler.run`:
 
 1. `body.read()` gives the state at `t` (guards: joint offset, velocity).
 2. Unless the condition is `feedback_off`: `encoder.encode(state, t, t+1)` gives events,
-   stamped with `body_sample_t_ms`; they are injected only in `feedback_on`.
+   stamped with `body_sample_t_ms`; they are injected in `feedback_on` and `motor_clamp`.
 3. `neural.advance(1 ms)` (10 Brian2 steps); `spikes_since(cursor)` returns the new
    recorded spikes; `total_spikes` feeds the storm guard.
 4. Mapped motor spikes accumulate.
-5. `body.advance(1 ms)` (10 MuJoCo steps) under the target already in effect.
+5. `body.advance(1 ms)` (10 MuJoCo steps) under the target already in effect. If configured,
+   each step receives the external joint torque for its current time; the profile never
+   reads body or neural state.
 6. `clocks.check(t+1)`.
 7. Every 10 ms: `decoder.decode(window)`, and `body.apply(command)` only in `feedback_on`
    (and `motor_only`), so spikes in `[t−10, t)` affect physics from `t` onward.
@@ -173,6 +181,9 @@ All under git-ignored `data/` and `outputs/`:
 - `outputs/{neural,io,bridge,sensory_bridge,closed_loop,smoke_test}/<run>/`: experiment
   results; each has `provenance.json` and `report.json` or `summary.json` with artifact
   hashes.
+- v0.8.1 calibration traces live under a new `outputs/closed_loop/load_sweep_*/`
+  directory; full runs add `external_torque_nm` to `timeline.parquet` and preserve
+  four matched condition subdirectories.
 
 Wheel packaging copies `configs/*` into the package as `…/profiles/` fallbacks
 (`pyproject.toml` `force-include`); `load_config()` prefers the repo copy.
